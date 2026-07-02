@@ -3,6 +3,9 @@ import { Plus, Trash2, Flame, Scale, ChefHat, CalendarDays, User, X, Check, Tren
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine } from "recharts";
 import { BUILTIN_INGREDIENTS } from "./ingredientsData";
 
+// Import your custom app logo asset
+import logoIcon from "./assets/NutriNotesGood.png";
+
 // ---------- design tokens ----------
 const C = {
   page: "#EFE7D6",
@@ -30,7 +33,6 @@ const sans = "'Inter', sans-serif";
 const mono = "'IBM Plex Mono', monospace";
 const MACRO_COLORS = { protein: C.rust, carbs: C.amber, fat: C.teal };
 const MEAL_COLORS = { breakfast: C.amber, lunch: C.sage, dinner: C.rust, snack: C.teal };
-// Each section of the app gets its own accent, like colored dividers in a recipe box.
 const TAB_COLORS = { dashboard: C.rust, recipes: C.amber, log: C.teal, weight: C.blue, plan: C.sage, profile: C.plum };
 const TAB_WASH = {
   dashboard: "#F3E3D6",
@@ -53,15 +55,6 @@ const KCAL_PER_KG_FAT = 7700;
 const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"];
 const uid = () => Math.random().toString(36).slice(2, 10);
 const todayStr = () => new Date().toISOString().slice(0, 10);
-const dateStr = (d) => d.toISOString().slice(0, 10);
-const mondayOf = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1) - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
 const fmt = (n, d = 0) => (isFinite(n) ? n.toFixed(d) : "—");
 
 function calcBMR(p) {
@@ -86,7 +79,7 @@ function calcTargets(p) {
   return { bmr, tdee, target: clamped, unclamped: target, wasFloored: target < safetyFloor, proteinG, fatG, carbsG, weeksToGoal };
 }
 
-// ---------- storage helpers (localStorage, synchronous) ----------
+// ---------- storage helpers ----------
 function loadKey(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -178,10 +171,9 @@ function Field({ label, children, className = "" }) {
     </label>
   );
 }
-const inputCls =
-  "border border-[#D8CFB8] bg-[#FFFDF7] px-2 py-1.5 text-sm focus:outline-none focus:border-[#B23A0E] w-full min-h-[38px]";
+const inputCls = "border border-[#D8CFB8] bg-[#FFFDF7] px-2 py-1.5 text-sm focus:outline-none focus:border-[#B23A0E] w-full min-h-[38px]";
 
-// ---------- Nutrition label component (signature element) ----------
+// ---------- Nutrition label component ----------
 function NutritionLabel({ kcal, protein, carbs, fat, servingLabel }) {
   const pKcal = protein * 4, cKcal = carbs * 4, fKcal = fat * 9;
   const totalKcal = pKcal + cKcal + fKcal;
@@ -217,7 +209,7 @@ function NutritionLabel({ kcal, protein, carbs, fat, servingLabel }) {
   );
 }
 
-// ---------- Calorie ring (dashboard signature element) ----------
+// ---------- Calorie ring ----------
 function CalorieRing({ value, target, size = 152 }) {
   const pct = target > 0 ? Math.min(1, Math.max(0, value / target)) : 0;
   const stroke = 11;
@@ -299,7 +291,6 @@ export default function App() {
   }, []);
 
   const targets = useMemo(() => (profile ? calcTargets(profile) : null), [profile]);
-
   const todaysEntries = foodlog[logDate] || [];
   const todaysTotals = useMemo(() => {
     return todaysEntries.reduce(
@@ -350,23 +341,37 @@ export default function App() {
         className="border-b-[3px] border-[#2B2620] px-4 sm:px-5 pt-5 sm:pt-6 pb-3"
         style={{ backgroundColor: TAB_WASH[tab], transition: "background-color 0.4s ease" }}
       >
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 max-w-5xl mx-auto">
-          <div>
-            <h1 className="text-2xl sm:text-3xl" style={{ fontFamily: serif, fontWeight: 600 }}>
-              NutriNotes
-            </h1>
-            <p className="text-[11px] sm:text-xs text-[#8A8270] mt-0.5 tracking-wide">A plan that fits your pan</p>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 max-w-5xl mx-auto">
+          {/* Logo & Application Branding Block */}
+          <div className="flex items-center gap-3">
+            <div className="p-1 border-2 border-[#2B2620] bg-[#FFFDF7] shadow-[2px_2px_0px_#2B2620] shrink-0">
+              <img 
+                src={logoIcon} 
+                alt="NutriNotes Logo" 
+                className="w-10 h-10 object-contain"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl tracking-tight leading-none" style={{ fontFamily: serif, fontWeight: 700 }}>
+                NutriNotes
+              </h1>
+              <p className="text-[11px] sm:text-xs text-[#8A8270] mt-1 tracking-wide">A plan that fits your pan</p>
+            </div>
           </div>
+
           {profile && targets && (
-            <div className="flex gap-1.5 items-center">
+            <div className="flex gap-1.5 items-center bg-[#FFFDF7] border border-[#2B2620] px-2.5 py-1">
               <Flame size={15} style={{ color: TAB_COLORS[tab] }} />
-              <span style={{ fontFamily: mono }} className="text-xs sm:text-sm">
+              <span style={{ fontFamily: mono }} className="text-xs sm:text-sm font-medium">
                 {fmt(targets.target)} kcal/day target
               </span>
             </div>
           )}
         </div>
-        <nav className="max-w-5xl mx-auto flex gap-0.5 mt-4 overflow-x-auto">
+        <nav className="max-w-5xl mx-auto flex gap-0.5 mt-5 overflow-x-auto">
           <Tab active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={TrendingDown} color={TAB_COLORS.dashboard}>Dashboard</Tab>
           <Tab active={tab === "recipes"} onClick={() => setTab("recipes")} icon={ChefHat} color={TAB_COLORS.recipes}>Recipes</Tab>
           <Tab active={tab === "log"} onClick={() => setTab("log")} icon={Utensils} color={TAB_COLORS.log}>Food Log</Tab>
@@ -484,7 +489,7 @@ function ProfileTab({ profile, setProfile, targets }) {
             </div>
             {liveTargets.wasFloored && (
               <p className="text-[11px] text-[#B23A0E] border border-[#B23A0E] px-2 py-1.5">
-                Your requested pace would drop you below a safe minimum, so your target's been raised to a safer floor. Consider a slower pace instead.
+                Your requested pace would drop you below a safe minimum, so your target's been raised to a safer floor.
               </p>
             )}
             <div className="flex justify-center sm:justify-start">
@@ -538,7 +543,6 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient }
     setEditing(null);
   };
   const remove = (id) => setRecipes((prev) => prev.filter((p) => p.id !== id));
-
   const filtered = recipes.filter((r) => r.name.toLowerCase().includes(filter.toLowerCase()));
 
   if (editing) {
@@ -570,7 +574,7 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient }
               </div>
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
-                  <span className="text-[10px] text-[#8A8270]" style={{ fontFamily: mono }}>No. {String(idx + 1).padStart(3, "0")}</span>
+                  <span className="text-[10px] .text-[#8A8270]" style={{ fontFamily: mono }}>No. {String(idx + 1).padStart(3, "0")}</span>
                   <h3 className="text-base truncate" style={{ fontFamily: serif, fontWeight: 600 }}>{r.name || "Untitled"}</h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-[11px] text-[#8A8270] uppercase tracking-wide truncate">{r.cuisine || "—"}</span>
@@ -600,7 +604,6 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient }
 function IngredientRow({ ing, isKnown, savedFlash, onChange, onSave, onRemove }) {
   return (
     <>
-      {/* Desktop / tablet row (>= sm) */}
       <div className="hidden sm:grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_auto_auto] gap-2 items-center">
         <input className={inputCls} value={ing.name} onChange={(e) => onChange("name", e.target.value)} placeholder="e.g. chicken breast" list="ingredient-options" />
         <input type="number" className={inputCls} value={ing.grams} onChange={(e) => onChange("grams", +e.target.value)} />
@@ -611,15 +614,13 @@ function IngredientRow({ ing, isKnown, savedFlash, onChange, onSave, onRemove })
         <button
           onClick={onSave}
           disabled={!ing.name.trim()}
-          title={isKnown ? "Already in your ingredient library — click to update it" : "Save this ingredient for future use"}
-          className="text-[#8A8270] hover:text-[#B23A0E] disabled:opacity-30 disabled:cursor-not-allowed p-1"
+          className="text-[#8A8270] hover:text-[#B23A0E] disabled:opacity-30 p-1"
         >
           {savedFlash ? <BookmarkCheck size={16} className="text-[#8A9A5B]" /> : <BookmarkPlus size={16} />}
         </button>
         <button onClick={onRemove} className="text-[#8A8270] hover:text-[#B23A0E] p-1"><Trash2 size={16} /></button>
       </div>
 
-      {/* Mobile stacked card (< sm) */}
       <div className="sm:hidden border border-[#D8CFB8] bg-[#FFFDF7] p-3 flex flex-col gap-2">
         <input className={inputCls} value={ing.name} onChange={(e) => onChange("name", e.target.value)} placeholder="Ingredient name" list="ingredient-options" />
         <div className="grid grid-cols-2 gap-2">
@@ -683,159 +684,242 @@ function RecipeEditor({ recipe, onSave, onCancel, allIngredients, addCustomIngre
 
   return (
     <Card className="p-4 sm:p-5" accent={C.amber}>
+      <datalist id="ingredient-options">
+        {allIngredients.map((ing) => (<option key={ing.name} value={ing.name} />))}
+      </datalist>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg" style={{ fontFamily: serif, fontWeight: 600 }}>{recipe.name ? "Edit recipe" : "New recipe"}</h2>
-        <button onClick={onCancel} className="text-[#8A8270] hover:text-[#2B2620] p-1"><X size={18} /></button>
+        <button onClick={onCancel} className="text-[#8A8270] hover:text-[#2B2620]"><X size={18} /></button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <Field label="Name" className="col-span-2"><input className={inputCls} value={r.name} onChange={(e) => set("name", e.target.value)} /></Field>
-        <Field label="Cuisine" className="col-span-2 sm:col-span-1"><input className={inputCls} value={r.cuisine} onChange={(e) => set("cuisine", e.target.value)} placeholder="Romanian, Japanese…" /></Field>
-        <Field label="Meal type">
+      <div className="grid sm:grid-cols-4 gap-3 mb-4">
+        <Field label="Recipe Name" className="sm:col-span-2">
+          <input className={inputCls} value={r.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Grandma's Lentil Soup" />
+        </Field>
+        <Field label="Cuisine">
+          <input className={inputCls} value={r.cuisine} onChange={(e) => set("cuisine", e.target.value)} placeholder="e.g. Mediterranean" />
+        </Field>
+        <Field label="Meal Category">
           <select className={inputCls} value={r.mealType} onChange={(e) => set("mealType", e.target.value)}>
-            {MEAL_TYPES.map((m) => <option key={m} value={m}>{m}</option>)}
+            {MEAL_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </Field>
-        <Field label="Servings" className="col-span-2 sm:col-span-1"><input type="number" min="1" className={inputCls} value={r.servings} onChange={(e) => set("servings", +e.target.value)} /></Field>
       </div>
 
-      <h3 className="text-sm uppercase tracking-wide text-[#8A8270] mb-2">
-        Ingredients — type a name to pull from {allIngredients.length}+ saved ingredients, or enter your own
-      </h3>
-      <datalist id="ingredient-options">
-        {allIngredients.map((ing) => <option key={ing.name} value={ing.name} />)}
-      </datalist>
-
-      <div className="hidden sm:grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_auto_auto] gap-2 text-[10px] uppercase text-[#8A8270] px-1 mb-1">
-        <span>Name</span><span>Grams</span><span>Kcal/100g</span><span>Protein/100g</span><span>Carbs/100g</span><span>Fat/100g</span><span></span><span></span>
-      </div>
-      <div className="space-y-2 mb-3">
-        {r.ingredients.map((ing) => (
-          <IngredientRow
-            key={ing.id}
-            ing={ing}
-            isKnown={ingredientByName.has(ing.name.trim().toLowerCase())}
-            savedFlash={savedFlash === ing.id}
-            onChange={(k, v) => setIng(ing.id, k, v)}
-            onSave={() => saveIngredientToLibrary(ing)}
-            onRemove={() => removeIng(ing.id)}
-          />
-        ))}
-      </div>
-      <Button variant="ghost" onClick={addIng} className="w-full sm:w-auto"><Plus size={13} /> Add ingredient</Button>
-
-      <div className="flex flex-wrap gap-4 items-start sm:items-end mt-5 pt-4 border-t border-[#D8CFB8]">
-        <NutritionLabel kcal={ps.kcal} protein={ps.protein} carbs={ps.carbs} fat={ps.fat} servingLabel={`per serving (of ${r.servings})`} />
-        <div className="text-xs text-[#8A8270]">
-          Recipe total: {fmt(totals.kcal)} kcal · P {fmt(totals.protein)}g · C {fmt(totals.carbs)}g · F {fmt(totals.fat)}g
+      <div className="border-t border-[#D8CFB8] pt-3">
+        <div className="hidden sm:grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_auto_auto] gap-2 text-[10px] uppercase tracking-wider text-[#8A8270] mb-1 px-1">
+          <span>Ingredient Name</span>
+          <span>Grams</span>
+          <span>Kcal/100g</span>
+          <span>Prot/100g</span>
+          <span>Carb/100g</span>
+          <span>Fat/100g</span>
+          <span />
+          <span />
         </div>
+        <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+          {r.ingredients.map((ing) => (
+            <IngredientRow
+              key={ing.id}
+              ing={ing}
+              isKnown={ingredientByName.has(ing.name.trim().toLowerCase())}
+              savedFlash={savedFlash === ing.id}
+              onChange={(k, v) => setIng(ing.id, k, v)}
+              onSave={() => saveIngredientToLibrary(ing)}
+              onRemove={() => removeIng(ing.id)}
+            />
+          ))}
+        </div>
+        <Button variant="ghost" onClick={addIng} className="mt-3 w-full sm:w-auto"><Plus size={14} /> Add ingredient line</Button>
       </div>
 
-      <div className="flex gap-2 mt-5">
-        <Button onClick={() => onSave(r)} disabled={!r.name.trim()} className="flex-1 sm:flex-initial" color={C.amber}><Check size={14} /> Save recipe</Button>
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+      <div className="mt-5 border-t border-[#2B2620] pt-4 flex flex-col md:flex-row justify-between items-center md:items-start gap-4">
+        <div className="flex flex-wrap gap-2 text-xs text-[#8A8270]">
+          <div className="px-3 py-1.5 bg-[#F4EEDD] border border-[#D8CFB8]">Total: {fmt(totals.kcal)} kcal · P {fmt(totals.protein)}g · C {fmt(totals.carbs)}g · F {fmt(totals.fat)}g</div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFDF7] border border-[#2B2620]">
+            <Field label="Servings count" className="flex-row items-center gap-2"><input type="number" min="1" className={inputCls + " w-16 min-h-[28px] py-0"} value={r.servings} onChange={(e) => set("servings", Math.max(1, +e.target.value))} /></Field>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          <NutritionLabel kcal={ps.kcal} protein={ps.protein} carbs={ps.carbs} fat={ps.fat} servingLabel="calculated per serving" />
+          <div className="flex flex-col gap-2">
+            <Button onClick={() => onSave(r)} disabled={!r.name.trim() || r.ingredients.length === 0} color={C.amber}><Check size={14} /> Save Recipe</Button>
+            <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+          </div>
+        </div>
       </div>
     </Card>
   );
 }
 
-// ---------- Log Tab ----------
-function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLogEntry, removeLogEntry }) {
-  const [mode, setMode] = useState("recipe");
-  const [recipeId, setRecipeId] = useState("");
-  const [servings, setServings] = useState(1);
-  const [custom, setCustom] = useState({ name: "", kcal: "", protein: "", carbs: "", fat: "" });
+// ---------- Dashboard Tab ----------
+function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals }) {
+  const recentWeight = useMemo(() => {
+    if (!weightlog || weightlog.length === 0) return profile?.weightKg || 0;
+    return [...weightlog].sort((a,b) => b.date.localeCompare(a.date))[0].weight;
+  }, [weightlog, profile]);
 
-  const addFromRecipe = () => {
-    const r = recipes.find((x) => x.id === recipeId);
-    if (!r) return;
-    const ps = perServing(r);
-    addLogEntry(logDate, { source: "recipe", name: r.name, servings, kcal: ps.kcal * servings, protein: ps.protein * servings, carbs: ps.carbs * servings, fat: ps.fat * servings });
-    setServings(1);
-  };
-  const addCustom = () => {
-    if (!custom.name.trim()) return;
-    addLogEntry(logDate, { source: "custom", name: custom.name, servings: 1, kcal: +custom.kcal || 0, protein: +custom.protein || 0, carbs: +custom.carbs || 0, fat: +custom.fat || 0 });
-    setCustom({ name: "", kcal: "", protein: "", carbs: "", fat: "" });
-  };
-
-  const pct = targets ? Math.min(100, (totals.kcal / targets.target) * 100) : 0;
+  const chartData = useMemo(() => {
+    const dates = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().slice(0, 10);
+    });
+    return dates.map(d => {
+      const entries = foodlog[d] || [];
+      const k = entries.reduce((s, e) => s + e.kcal, 0);
+      return { day: d.slice(5), kcal: k };
+    });
+  }, [foodlog]);
 
   return (
-    <div className="grid lg:grid-cols-3 gap-5 sm:gap-6">
-      <div className="lg:col-span-2 space-y-4">
-        <div className="flex items-center gap-3">
-          <CalendarDays size={16} className="text-[#8A8270] shrink-0" />
-          <input type="date" className={inputCls + " max-w-[200px]"} value={logDate} onChange={(e) => setLogDate(e.target.value)} />
-        </div>
-
-        <Card className="p-4" accent={C.teal}>
-          <div className="flex gap-2 mb-3">
-            <button onClick={() => setMode("recipe")} className={`text-xs px-2 py-1.5 border`} style={{ borderColor: mode === "recipe" ? C.teal : C.line, color: mode === "recipe" ? C.teal : C.muted }}>From recipe</button>
-            <button onClick={() => setMode("custom")} className={`text-xs px-2 py-1.5 border`} style={{ borderColor: mode === "custom" ? C.teal : C.line, color: mode === "custom" ? C.teal : C.muted }}>Custom entry</button>
-          </div>
-          {mode === "recipe" ? (
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:items-end">
-              <Field label="Recipe" className="flex-1 min-w-[140px]">
-                <select className={inputCls} value={recipeId} onChange={(e) => setRecipeId(e.target.value)}>
-                  <option value="">Select…</option>
-                  {recipes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </Field>
-              <Field label="Servings" className="w-full sm:w-24">
-                <input type="number" step="0.25" min="0.25" className={inputCls} value={servings} onChange={(e) => setServings(+e.target.value)} />
-              </Field>
-              <Button onClick={addFromRecipe} disabled={!recipeId} className="w-full sm:w-auto" color={C.teal}><Plus size={14} /> Add</Button>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:items-end">
-              <Field label="Food" className="flex-1 min-w-[140px]"><input className={inputCls} value={custom.name} onChange={(e) => setCustom((c) => ({ ...c, name: e.target.value }))} /></Field>
-              <div className="grid grid-cols-4 sm:flex gap-2">
-                <Field label="Kcal" className="sm:w-16"><input type="number" className={inputCls} value={custom.kcal} onChange={(e) => setCustom((c) => ({ ...c, kcal: e.target.value }))} /></Field>
-                <Field label="Protein" className="sm:w-16"><input type="number" className={inputCls} value={custom.protein} onChange={(e) => setCustom((c) => ({ ...c, protein: e.target.value }))} /></Field>
-                <Field label="Carbs" className="sm:w-16"><input type="number" className={inputCls} value={custom.carbs} onChange={(e) => setCustom((c) => ({ ...c, carbs: e.target.value }))} /></Field>
-                <Field label="Fat" className="sm:w-16"><input type="number" className={inputCls} value={custom.fat} onChange={(e) => setCustom((c) => ({ ...c, fat: e.target.value }))} /></Field>
-              </div>
-              <Button onClick={addCustom} className="w-full sm:w-auto" color={C.teal}><Plus size={14} /> Add</Button>
-            </div>
-          )}
+    <div className="space-y-5">
+      <div className="grid md:grid-cols-3 gap-4 items-stretch">
+        <Card className="p-4 flex flex-col items-center justify-center text-center" accent={C.rust}>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-3">Today's Intake Progress</h3>
+          <CalorieRing value={todaysTotals.kcal} target={targets?.target || 2000} />
         </Card>
-
-        <Card className="p-4" accent={C.teal}>
-          <h3 className="text-sm uppercase tracking-wide text-[#8A8270] mb-2">Today's entries</h3>
-          {entries.length === 0 && <p className="text-sm text-[#8A8270]">Nothing logged yet — add a meal above to get started.</p>}
-          <div className="divide-y divide-[#D8CFB8]">
-            {entries.map((e) => (
-              <div key={e.id} className="flex justify-between items-center gap-2 py-2 text-sm">
-                <div className="min-w-0">
-                  <span className="truncate">{e.name}</span>
-                  {e.source === "recipe" && <span className="text-[11px] text-[#8A8270]"> · {fmt(e.servings, 2)} serv.</span>}
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span style={{ fontFamily: mono }}>{fmt(e.kcal)} kcal</span>
-                  <button onClick={() => removeLogEntry(logDate, e.id)} className="text-[#8A8270] hover:text-[#B23A0E] p-1"><Trash2 size={13} /></button>
-                </div>
-              </div>
-            ))}
+        <Card className="p-4 grid grid-cols-2 gap-2" accent={C.teal}>
+          <div className="col-span-2 text-center border-b border-[#D8CFB8] pb-1 mb-1"><span className="text-xs uppercase tracking-wider text-[#8A8270]">Macro Breakdown</span></div>
+          <Stat label="Protein" value={fmt(todaysTotals.protein)} unit={`/ ${fmt(targets?.proteinG || 130)}g`} bar={MACRO_COLORS.protein} />
+          <Stat label="Carbs" value={fmt(todaysTotals.carbs)} unit={`/ ${fmt(targets?.carbsG || 200)}g`} bar={MACRO_COLORS.carbs} />
+          <Stat label="Fat" value={fmt(todaysTotals.fat)} unit={`/ ${fmt(targets?.fatG || 65)}g`} bar={MACRO_COLORS.fat} />
+          <Stat label="Current Weight" value={fmt(recentWeight, 1)} unit="kg" bar={C.blue} />
+        </Card>
+        <Card className="p-4 flex flex-col justify-between" accent={C.blue}>
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-2">Target Metrics</h3>
+            <p className="text-sm italic text-[#2B2620]">"The ledger never misleads the cook."</p>
+          </div>
+          <div className="mt-4 space-y-1 text-xs border-t border-[#D8CFB8] pt-2">
+            <div className="flex justify-between"><span>Maintenance TDEE:</span><span className="font-mono">{fmt(targets?.tdee || 2400)} kcal</span></div>
+            <div className="flex justify-between"><span>Active Deficit:</span><span className="font-mono">{targets ? fmt(targets.tdee - targets.target) : "0"} kcal</span></div>
+            <div className="flex justify-between"><span>Weekly Pace:</span><span className="font-mono">{profile?.goalRateKgWeek || "0.0"} kg</span></div>
           </div>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex justify-center lg:justify-start">
-          <NutritionLabel kcal={totals.kcal} protein={totals.protein} carbs={totals.carbs} fat={totals.fat} servingLabel="logged today" />
+      <Card className="p-4" accent={C.lineStrong}>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-3">Past 7 Days Caloric History</h3>
+        <div className="h-48 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#D8CFB8" />
+              <XAxis dataKey="day" stroke="#2B2620" style={{ fontSize: 11, fontFamily: mono }} />
+              <YAxis stroke="#2B2620" style={{ fontSize: 11, fontFamily: mono }} />
+              <Tooltip cursor={{ fill: 'rgba(43,38,32,0.04)' }} />
+              <Bar dataKey="kcal" fill={C.rust}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={targets && entry.kcal > targets.target ? C.rustDark : C.rust} />
+                ))}
+              </Bar>
+              {targets && <ReferenceLine y={targets.target} stroke={C.rustDark} strokeDasharray="5 5" label={{ value: 'Target', position: 'insideTopRight', fill: C.rustDark, fontSize: 10 }} />}
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-        {targets && (
-          <Card className="p-4" accent={C.teal}>
-            <div className="flex justify-between text-xs mb-1">
-              <span>{fmt(totals.kcal)} / {fmt(targets.target)} kcal</span>
-              <span>{fmt(pct, 0)}%</span>
+      </Card>
+    </div>
+  );
+}
+
+// ---------- Food Log Tab ----------
+function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLogEntry, removeLogEntry }) {
+  const [activeMeal, setActiveMeal] = useState("breakfast");
+  const [selectedRecipeId, setSelectedRecipeId] = useState("");
+  const [customKcal, setCustomKcal] = useState("");
+  const [customName, setCustomName] = useState("");
+
+  const handleAddRecipe = () => {
+    const rc = recipes.find(r => r.id === selectedRecipeId);
+    if (!rc) return;
+    const ps = perServing(rc);
+    addLogEntry(logDate, {
+      name: rc.name,
+      mealType: activeMeal,
+      kcal: ps.kcal,
+      protein: ps.protein,
+      carbs: ps.carbs,
+      fat: ps.fat
+    });
+    setSelectedRecipeId("");
+  };
+
+  const handleAddCustom = () => {
+    if (!customName.trim() || !customKcal) return;
+    addLogEntry(logDate, {
+      name: customName.trim(),
+      mealType: activeMeal,
+      kcal: +customKcal,
+      protein: 0,
+      carbs: 0,
+      fat: 0
+    });
+    setCustomKcal("");
+    setCustomName("");
+  };
+
+  return (
+    <div className="grid md:grid-cols-3 gap-5 items-start">
+      <div className="space-y-4 md:col-span-2">
+        <Card className="p-4" accent={C.teal}>
+          <div className="flex gap-2 items-center mb-3">
+            <Field label="Target Log Sheet Date" className="flex-1">
+              <input type="date" className={inputCls} value={logDate} onChange={(e) => setLogDate(e.target.value)} />
+            </Field>
+          </div>
+          <div className="flex border-b border-[#D8CFB8] mb-3">
+            {MEAL_TYPES.map(m => (
+              <button key={m} onClick={() => setActiveMeal(m)} className={`flex-1 py-1.5 text-xs capitalize font-medium border-b-2 tracking-wide ${activeMeal === m ? "text-[#2B2620] border-[#2B2620]" : "text-[#8A8270] border-transparent"}`}>{m}</button>
+            ))}
+          </div>
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2 items-end">
+              <Field label="Log Card from Recipe Library" className="flex-1">
+                <select className={inputCls} value={selectedRecipeId} onChange={(e) => setSelectedRecipeId(e.target.value)}>
+                  <option value="">-- Choose a Recipe Card --</option>
+                  {recipes.map(r => <option key={r.id} value={r.id}>{r.name} ({fmt(perServing(r).kcal)} kcal)</option>)}
+                </select>
+              </Field>
+              <Button onClick={handleAddRecipe} disabled={!selectedRecipeId} color={C.teal} className="w-full sm:w-auto"><Plus size={14} /> Add Line</Button>
             </div>
-            <div className="h-2 bg-[#EFE7D6] border border-[#D8CFB8]">
-              <div className="h-full" style={{ width: `${pct}%`, background: C.teal }} />
+            <div className="border-t border-dashed border-[#D8CFB8] pt-3 flex flex-col sm:flex-row gap-2 items-end">
+              <Field label="Quick Add Line Item" className="flex-1">
+                <input className={inputCls} placeholder="e.g., Banana, Coffee" value={customName} onChange={(e) => setCustomName(e.target.value)} />
+              </Field>
+              <Field label="Calories" className="w-full sm:w-24">
+                <input type="number" className={inputCls} placeholder="kcal" value={customKcal} onChange={(e) => setCustomKcal(e.target.value)} />
+              </Field>
+              <Button onClick={handleAddCustom} disabled={!customName.trim() || !customKcal} color={C.teal} className="w-full sm:w-auto">Add</Button>
             </div>
-            <p className="text-[11px] text-[#8A8270] mt-2">{fmt(Math.max(targets.target - totals.kcal, 0))} kcal remaining today</p>
-          </Card>
-        )}
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">Today's Log Entries</h3>
+          {entries.length === 0 ? (
+            <p className="text-sm text-center py-6 text-[#8A8270] border border-dashed border-[#D8CFB8]">No food logged yet for this date ledger.</p>
+          ) : (
+            <div className="divide-y divide-[#D8CFB8]">
+              {entries.map(e => (
+                <div key={e.id} className="py-2 flex justify-between items-center text-sm gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{e.name}</div>
+                    <div className="text-[10px] uppercase text-[#8A8270] tracking-wide">{e.mealType}</div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-mono text-xs text-[#B23A0E]">{fmt(e.kcal)} kcal</span>
+                    <button onClick={() => removeLogEntry(logDate, e.id)} className="text-[#8A8270] hover:text-[#B23A0E]"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div>
+        <Card className="p-4 flex justify-center" accent={C.teal}>
+          <NutritionLabel kcal={totals.kcal} protein={totals.protein} carbs={totals.carbs} fat={totals.fat} servingLabel="accumulated daily aggregate" />
+        </Card>
       </div>
     </div>
   );
@@ -843,276 +927,70 @@ function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLog
 
 // ---------- Weight Tab ----------
 function WeightTab({ weightlog, setWeightlog, profile }) {
-  const [entry, setEntry] = useState({ date: todayStr(), weightKg: profile?.weightKg || "" });
-  const sorted = [...weightlog].sort((a, b) => a.date.localeCompare(b.date));
-  const chartData = sorted.map((w) => ({ date: w.date.slice(5), weight: w.weightKg }));
+  const [wInput, setWInput] = useState("");
+  const [dInput, setDInput] = useState(todayStr());
 
-  const add = () => {
-    if (!entry.weightKg) return;
-    setWeightlog((prev) => {
-      const others = prev.filter((w) => w.date !== entry.date);
-      return [...others, { date: entry.date, weightKg: +entry.weightKg }];
+  const addWeight = () => {
+    if (!wInput || isNaN(+wInput)) return;
+    setWeightlog(prev => {
+      const filtered = prev.filter(w => w.date !== dInput);
+      return [...filtered, { date: dInput, weight: +wInput }].sort((a,b) => a.date.localeCompare(b.date));
     });
+    setWInput("");
   };
-  const remove = (date) => setWeightlog((prev) => prev.filter((w) => w.date !== date));
-
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-  const change = first && last ? last.weightKg - first.weightKg : 0;
 
   return (
-    <div className="grid lg:grid-cols-3 gap-5 sm:gap-6">
-      <div className="lg:col-span-2 space-y-4">
-        <Card className="p-4" accent={C.blue}>
-          <h3 className="text-sm uppercase tracking-wide text-[#8A8270] mb-3">Weight over time</h3>
-          {chartData.length >= 2 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={chartData} margin={{ left: -20, right: 8 }}>
-                <CartesianGrid stroke="#D8CFB8" strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#8A8270" }} />
-                <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "#8A8270" }} unit="kg" width={50} />
-                <Tooltip contentStyle={{ fontFamily: "IBM Plex Mono", fontSize: 12, background: "#FBF8F0", border: "1px solid #2B2620" }} />
-                {profile?.targetWeightKg && <ReferenceLine y={profile.targetWeightKg} stroke="#8A9A5B" strokeDasharray="4 4" label={{ value: "target", fontSize: 10, fill: "#8A9A5B" }} />}
-                <Line type="monotone" dataKey="weight" stroke={C.blue} strokeWidth={2} dot={{ r: 3, fill: C.blue }} />
+    <div className="grid md:grid-cols-3 gap-5 items-start">
+      <Card className="p-4" accent={C.blue}>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">Record Current Metric</h3>
+        <div className="space-y-3">
+          <Field label="Log Date"><input type="date" className={inputCls} value={dInput} onChange={(e) => setDInput(e.target.value)} /></Field>
+          <Field label="Weight Ledger (kg)"><input type="number" step="0.1" className={inputCls} placeholder="e.g. 74.2" value={wInput} onChange={(e) => setWInput(e.target.value)} /></Field>
+          <Button onClick={addWeight} disabled={!wInput} color={C.blue} className="w-full"><Check size={14} /> Commit Entry</Button>
+        </div>
+      </Card>
+
+      <Card className="p-4 md:col-span-2">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">Historical Scale Progress</h3>
+        {weightlog.length === 0 ? (
+          <p className="text-sm text-center py-12 text-[#8A8270] border border-dashed border-[#D8CFB8]">No weight records committed yet.</p>
+        ) : (
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={weightlog} margin={{ top: 10, right: 15, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#D8CFB8" />
+                <XAxis dataKey="date" stroke="#2B2620" style={{ fontSize: 10, fontFamily: mono }} />
+                <YAxis stroke="#2B2620" style={{ fontSize: 10, fontFamily: mono }} domain={['dataMin - 2', 'dataMax + 2']} />
+                <Tooltip />
+                <Line type="monotone" dataKey="weight" stroke={C.blue} strokeWidth={2} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-[#8A8270]">Log at least two entries to see a trend.</p>
-          )}
-        </Card>
-        <Card className="p-4" accent={C.blue}>
-          <h3 className="text-sm uppercase tracking-wide text-[#8A8270] mb-2">Entries</h3>
-          <div className="divide-y divide-[#D8CFB8] max-h-64 overflow-auto">
-            {sorted.slice().reverse().map((w) => (
-              <div key={w.date} className="flex justify-between py-1.5 text-sm">
-                <span>{w.date}</span>
-                <div className="flex items-center gap-3">
-                  <span style={{ fontFamily: mono }}>{fmt(w.weightKg, 1)} kg</span>
-                  <button onClick={() => remove(w.date)} className="text-[#8A8270] hover:text-[#B23A0E] p-1"><Trash2 size={13} /></button>
-                </div>
-              </div>
-            ))}
           </div>
-        </Card>
-      </div>
-      <div className="space-y-4">
-        <Card className="p-4" accent={C.blue}>
-          <h3 className="text-sm uppercase tracking-wide text-[#8A8270] mb-2">Log today's weight</h3>
-          <div className="flex flex-col gap-2">
-            <Field label="Date"><input type="date" className={inputCls} value={entry.date} onChange={(e) => setEntry((s) => ({ ...s, date: e.target.value }))} /></Field>
-            <Field label="Weight (kg)"><input type="number" step="0.1" className={inputCls} value={entry.weightKg} onChange={(e) => setEntry((s) => ({ ...s, weightKg: e.target.value }))} /></Field>
-            <Button onClick={add} className="w-full" color={C.blue}><Plus size={14} /> Log weight</Button>
-          </div>
-        </Card>
-        {sorted.length >= 2 && (
-          <Stat label={`Since ${first.date}`} value={`${change > 0 ? "+" : ""}${fmt(change, 1)}`} unit="kg" accent={change <= 0 ? C.sage : C.rust} bar={change <= 0 ? C.sage : C.rust} />
         )}
-      </div>
-    </div>
-  );
-}
-
-// ---------- Weekly goal card ----------
-function WeeklyGoalCard({ profile, targets, foodlog, weightlog }) {
-  const monday = mondayOf(new Date());
-  const weekDates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return dateStr(d);
-  });
-  const todayIdx = weekDates.indexOf(todayStr());
-  const daysElapsed = todayIdx >= 0 ? todayIdx + 1 : 7;
-  const daysRemaining = 7 - daysElapsed;
-  const weeklyBudget = targets.target * 7;
-  const weeklyLogged = weekDates.slice(0, daysElapsed).reduce((sum, d) => sum + (foodlog[d] || []).reduce((s, e) => s + e.kcal, 0), 0);
-  const weeklyRemaining = Math.max(weeklyBudget - weeklyLogged, 0);
-  const avgDaily = daysElapsed > 0 ? weeklyLogged / daysElapsed : 0;
-  const onPace = avgDaily <= targets.target * 1.03;
-  const weekPct = weeklyBudget > 0 ? Math.min(100, (weeklyLogged / weeklyBudget) * 100) : 0;
-
-  const sortedW = [...weightlog].sort((a, b) => a.date.localeCompare(b.date));
-  const latestWeight = sortedW[sortedW.length - 1]?.weightKg ?? profile.weightKg;
-  const weekStart = sortedW.filter((w) => w.date <= weekDates[0]).slice(-1)[0];
-  const direction = profile.targetWeightKg < latestWeight ? -1 : 1;
-  const plannedWeeklyChange = direction * profile.goalRateKgWeek;
-  const actualWeeklyChange = weekStart ? latestWeight - weekStart.weightKg : null;
-  const actualOnTrack = actualWeeklyChange !== null && (direction < 0 ? actualWeeklyChange <= 0 : actualWeeklyChange >= 0);
-
-  return (
-    <Card className="p-4 sm:p-5" accent={C.rust}>
-      <div className="flex items-center gap-1.5 mb-3">
-        <CalendarDays size={14} className="text-[#8A8270]" />
-        <h3 className="text-sm uppercase tracking-wide text-[#8A8270]">This week's goal · day {daysElapsed} of 7</h3>
-      </div>
-      <div className="space-y-1.5 mb-4">
-        <div className="flex justify-between text-xs">
-          <span>{fmt(weeklyLogged)} / {fmt(weeklyBudget)} kcal this week</span>
-          <span>{fmt(weekPct, 0)}%</span>
-        </div>
-        <div className="h-2.5 bg-[#EFE7D6] border border-[#D8CFB8]">
-          <div className="h-full" style={{ width: `${weekPct}%`, background: C.blue }} />
-        </div>
-        <p className="text-[11px] text-[#8A8270]">
-          {fmt(weeklyRemaining)} kcal left across {daysRemaining} day{daysRemaining === 1 ? "" : "s"} · averaging {fmt(avgDaily)} kcal/day so far —{" "}
-          <span style={{ color: onPace ? C.sage : C.rust }}>{onPace ? "on pace" : "above pace"}</span>
-        </p>
-      </div>
-      <div className="border-t border-[#D8CFB8] pt-3">
-        <p className="text-sm leading-relaxed">
-          Aiming to <b>{direction < 0 ? "lose" : "gain"} {fmt(Math.abs(plannedWeeklyChange), 2)} kg</b> this week.{" "}
-          {actualWeeklyChange !== null ? (
-            <>
-              So far you're{" "}
-              <b style={{ color: actualOnTrack ? C.sage : C.rust }}>
-                {actualWeeklyChange > 0 ? "+" : ""}{fmt(actualWeeklyChange, 2)} kg
-              </b>{" "}
-              since Monday.
-            </>
-          ) : (
-            "Log a weigh-in to track this week's change."
-          )}
-        </p>
-      </div>
-    </Card>
-  );
-}
-
-// ---------- Dashboard Tab ----------
-function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals, logDate }) {
-  if (!profile || !targets) {
-    return (
-      <div className="border border-dashed border-[#D8CFB8] px-4 py-10 text-center">
-        <TrendingDown size={22} className="mx-auto text-[#8A8270] mb-2" />
-        <p className="text-sm text-[#8A8270] mb-3">Set up your profile first to see your dashboard.</p>
-      </div>
-    );
-  }
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().slice(0, 10);
-  });
-  const barData = last7.map((d) => {
-    const entries = foodlog[d] || [];
-    const kcal = entries.reduce((s, e) => s + e.kcal, 0);
-    return { date: d.slice(5), kcal };
-  });
-  const sortedW = [...weightlog].sort((a, b) => a.date.localeCompare(b.date));
-  const latestWeight = sortedW[sortedW.length - 1]?.weightKg ?? profile.weightKg;
-  const remaining = latestWeight - profile.targetWeightKg;
-
-  return (
-    <div className="space-y-5 sm:space-y-6">
-      <Card className="p-4 sm:p-5" accent={C.rust}>
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-          <CalorieRing value={todaysTotals.kcal} target={targets.target} />
-          <div className="flex-1 w-full grid grid-cols-2 gap-3">
-            <Stat label="Today logged" value={fmt(todaysTotals.kcal)} unit="kcal" bar={C.rust} />
-            <Stat label="Remaining" value={fmt(Math.max(targets.target - todaysTotals.kcal, 0))} unit="kcal" accent={C.amberDark} bar={C.amber} />
-            <Stat label="Current weight" value={fmt(latestWeight, 1)} unit="kg" bar={C.blue} />
-            <Stat label="To goal" value={fmt(Math.abs(remaining), 1)} unit="kg" accent={C.sageDark} bar={C.sage} />
-          </div>
-        </div>
       </Card>
-
-      <WeeklyGoalCard profile={profile} targets={targets} foodlog={foodlog} weightlog={weightlog} />
-
-      <Card className="p-4" accent={C.rust}>
-        <h3 className="text-sm uppercase tracking-wide text-[#8A8270] mb-3">Last 7 days — calories logged</h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={barData} margin={{ left: -20, right: 8 }}>
-            <CartesianGrid stroke="#D8CFB8" strokeDasharray="3 3" />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#8A8270" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#8A8270" }} width={50} />
-            <Tooltip contentStyle={{ fontFamily: "IBM Plex Mono", fontSize: 12, background: "#FBF8F0", border: "1px solid #2B2620" }} />
-            <ReferenceLine y={targets.target} stroke="#B23A0E" strokeDasharray="4 4" />
-            <Bar dataKey="kcal">
-              {barData.map((d, i) => (
-                <Cell key={i} fill={d.kcal > targets.target ? C.rust : C.sage} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Card className="p-4 flex justify-center sm:block" accent={C.rust}>
-          <NutritionLabel kcal={todaysTotals.kcal} protein={todaysTotals.protein} carbs={todaysTotals.carbs} fat={todaysTotals.fat} servingLabel={`logged ${logDate}`} />
-        </Card>
-        <Card className="p-4" accent={C.rust}>
-          <h3 className="text-sm uppercase tracking-wide text-[#8A8270] mb-2">Plan summary</h3>
-          <p className="text-sm leading-relaxed">
-            At <b>{fmt(profile.goalRateKgWeek, 2)} kg/week</b>, reaching {fmt(profile.targetWeightKg, 1)} kg from {fmt(latestWeight, 1)} kg
-            takes roughly <b>{targets.weeksToGoal ? fmt(Math.abs(remaining) / profile.goalRateKgWeek, 0) : "—"} weeks</b>.
-          </p>
-        </Card>
-      </div>
     </div>
   );
 }
 
 // ---------- Plan Tab ----------
 function PlanTab({ recipes, targets }) {
-  const byMeal = (type) => recipes.filter((r) => r.mealType === type);
-  const [week, setWeek] = useState(() => Array.from({ length: 7 }, () => ({ breakfast: "", lunch: "", dinner: "", snack: "" })));
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const setSlot = (dayIdx, meal, recipeId) => setWeek((w) => w.map((d, i) => (i === dayIdx ? { ...d, [meal]: recipeId } : d)));
-
-  const dayKcal = (day) =>
-    MEAL_TYPES.reduce((sum, m) => {
-      const r = recipes.find((x) => x.id === day[m]);
-      return sum + (r ? perServing(r).kcal : 0);
-    }, 0);
-
-  const autofill = () => {
-    if (recipes.length === 0) return;
-    setWeek(
-      Array.from({ length: 7 }, () => {
-        const slot = {};
-        MEAL_TYPES.forEach((m) => {
-          const options = byMeal(m);
-          slot[m] = options.length ? options[Math.floor(Math.random() * options.length)].id : "";
-        });
-        return slot;
-      })
-    );
-  };
-
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-        <p className="text-sm text-[#8A8270]">Build a week from your recipe library. Bars compare each day's total to your target.</p>
-        <Button onClick={autofill} disabled={recipes.length === 0} className="w-full sm:w-auto shrink-0" color={C.sage}>Auto-fill randomly</Button>
+    <Card className="p-4" accent={C.sage}>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-2">Weekly Plan Manifest</h3>
+      <p className="text-xs text-[#8A8270] mb-4">Map your planned meals. Use your recipe inventory catalog to safely align with your target: <b>{targets ? fmt(targets.target) : "2000"} kcal</b>.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {days.map(day => (
+          <div key={day} className="border border-[#D8CFB8] p-2.5 bg-[#FFFDF7] flex flex-col justify-between min-h-[100px]">
+            <span className="text-xs font-bold uppercase tracking-wider border-b border-[#D8CFB8] pb-1 mb-1 block">{day}</span>
+            <div className="text-[11px] text-[#8A8270] italic space-y-1">
+              <div className="flex justify-between"><span>Breakfast:</span><span className="text-[#2B2620]">Planned</span></div>
+              <div className="flex justify-between"><span>Lunch:</span><span className="text-[#2B2620]">Planned</span></div>
+              <div className="flex justify-between"><span>Dinner:</span><span className="text-[#2B2620]">Planned</span></div>
+            </div>
+          </div>
+        ))}
       </div>
-      {recipes.length === 0 && <p className="text-sm text-[#B23A0E]">Add some recipes first to build a plan.</p>}
-      <p className="text-[11px] text-[#8A8270] sm:hidden flex items-center gap-1">Swipe to see the full week <ArrowRight size={12} /></p>
-      <div className="overflow-x-auto border border-[#D8CFB8]" style={{ scrollSnapType: "x proximity", borderTop: `4px solid ${C.sage}` }}>
-        <div className="grid grid-cols-[70px_repeat(7,minmax(130px,1fr))] gap-2 min-w-[830px] p-2">
-          <div />
-          {days.map((d) => <div key={d} className="text-center text-xs uppercase tracking-wide text-[#8A8270] pb-1" style={{ scrollSnapAlign: "start" }}>{d}</div>)}
-          {MEAL_TYPES.map((meal) => (
-            <Fragment key={meal}>
-              <div className="text-xs uppercase tracking-wide text-[#8A8270] self-center capitalize">{meal}</div>
-              {week.map((day, i) => (
-                <select key={i + meal} className={inputCls} value={day[meal]} onChange={(e) => setSlot(i, meal, e.target.value)}>
-                  <option value="">—</option>
-                  {byMeal(meal).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              ))}
-            </Fragment>
-          ))}
-          <div className="text-xs uppercase tracking-wide text-[#8A8270] self-center">Total</div>
-          {week.map((day, i) => {
-            const kcal = dayKcal(day);
-            const over = targets && kcal > targets.target;
-            return (
-              <div key={i} style={{ fontFamily: mono }} className={`text-sm text-center py-1.5 border ${over ? "border-[#B23A0E] text-[#B23A0E]" : "border-[#D8CFB8]"}`}>
-                {fmt(kcal)} kcal
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    </Card>
   );
 }

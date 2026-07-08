@@ -4,6 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { BUILTIN_INGREDIENTS } from "./ingredientsData";
 import { supabase } from "./supabaseClient";
 import AuthScreen from "./AuthScreen";
+import { translate, LANGUAGES } from "./i18n";
 
 // Import your custom app logo asset
 import logoIcon from "./assets/NutriNotesGood.png";
@@ -97,6 +98,27 @@ function Tab({ active, onClick, icon: Icon, children, color = C.rust }) {
   );
 }
 
+function LanguageSwitcher({ language, setLanguage, className = "" }) {
+  return (
+    <div className={`flex border border-[#2B2620] overflow-hidden ${className}`}>
+      {LANGUAGES.map((l, i) => (
+        <button
+          key={l.code}
+          onClick={() => setLanguage(l.code)}
+          className={`px-2 py-1 text-[11px] font-medium tracking-wide transition-colors ${i > 0 ? "border-l border-[#2B2620]" : ""}`}
+          style={{
+            fontFamily: sans,
+            background: language === l.code ? C.ink : "#FFFDF7",
+            color: language === l.code ? C.card : C.ink,
+          }}
+        >
+          {l.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Stat({ label, value, unit, accent, bar }) {
   return (
     <div className="flex flex-col border border-[#2B2620] px-3 py-2.5 bg-[#FBF8F0] min-w-0">
@@ -159,18 +181,18 @@ function Field({ label, children, className = "" }) {
 const inputCls = "border border-[#D8CFB8] bg-[#FFFDF7] px-2 py-1.5 text-sm focus:outline-none focus:border-[#B23A0E] w-full min-h-[38px]";
 
 // ---------- Nutrition label component ----------
-function NutritionLabel({ kcal, protein, carbs, fat, servingLabel }) {
+function NutritionLabel({ kcal, protein, carbs, fat, servingLabel, t }) {
   const pKcal = protein * 4, cKcal = carbs * 4, fKcal = fat * 9;
   const totalKcal = pKcal + cKcal + fKcal;
   const seg = (v) => (totalKcal > 0 ? (v / totalKcal) * 100 : 0);
   return (
     <div className="border-[3px] border-[#2B2620] bg-[#FFFDF7] p-3 w-full max-w-[220px]" style={{ fontFamily: mono }}>
       <div className="text-[13px] font-bold border-b-[6px] border-[#2B2620] pb-1 mb-1" style={{ fontFamily: serif }}>
-        Nutrition
+        {t("nutrition.title")}
       </div>
-      <div className="text-[10px] text-[#8A8270] mb-1">{servingLabel || "per serving"}</div>
+      <div className="text-[10px] text-[#8A8270] mb-1">{servingLabel || t("nutrition.perServing")}</div>
       <div className="flex justify-between items-baseline border-b border-[#2B2620] py-1">
-        <span className="text-[12px]">Calories</span>
+        <span className="text-[12px]">{t("nutrition.calories")}</span>
         <span className="text-lg font-bold">{fmt(kcal)}</span>
       </div>
       {totalKcal > 0 && (
@@ -181,9 +203,9 @@ function NutritionLabel({ kcal, protein, carbs, fat, servingLabel }) {
         </div>
       )}
       {[
-        ["Protein", protein, "g", MACRO_COLORS.protein],
-        ["Carbs", carbs, "g", MACRO_COLORS.carbs],
-        ["Fat", fat, "g", MACRO_COLORS.fat],
+        [t("stat.protein"), protein, "g", MACRO_COLORS.protein],
+        [t("stat.carbs"), carbs, "g", MACRO_COLORS.carbs],
+        [t("stat.fat"), fat, "g", MACRO_COLORS.fat],
       ].map(([l, v, u, color]) => (
         <div key={l} className="flex justify-between items-center text-[11px] py-0.5 border-b border-dashed border-[#D8CFB8]">
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 shrink-0" style={{ background: color }} />{l}</span>
@@ -195,7 +217,7 @@ function NutritionLabel({ kcal, protein, carbs, fat, servingLabel }) {
 }
 
 // ---------- Calorie ring ----------
-function CalorieRing({ value, target, size = 152 }) {
+function CalorieRing({ value, target, size = 152, t }) {
   const pct = target > 0 ? Math.min(1, Math.max(0, value / target)) : 0;
   const stroke = 11;
   const r = (size - stroke) / 2;
@@ -222,7 +244,7 @@ function CalorieRing({ value, target, size = 152 }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span style={{ fontFamily: mono, fontSize: size * 0.17, color: C.ink, fontWeight: 600, lineHeight: 1 }}>{fmt(value)}</span>
-        <span style={{ fontFamily: sans, fontSize: size * 0.075, color: C.muted, marginTop: 4 }}>of {fmt(target)} kcal</span>
+        <span style={{ fontFamily: sans, fontSize: size * 0.075, color: C.muted, marginTop: 4 }}>{t("common.of")} {fmt(target)} kcal</span>
       </div>
     </div>
   );
@@ -232,6 +254,23 @@ function CalorieRing({ value, target, size = 152 }) {
 export default function App() {
   // undefined = still checking for a session, null = logged out, object = logged in
   const [session, setSession] = useState(undefined);
+
+  // UI language — a device-level preference, independent of the account
+  const [language, setLanguage] = useState(() => {
+    try {
+      return localStorage.getItem("nutrinotes_lang") || "en";
+    } catch {
+      return "en";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("nutrinotes_lang", language);
+    } catch {
+      // ignore storage errors (e.g. private browsing)
+    }
+  }, [language]);
+  const t = useCallback((key, vars) => translate(language, key, vars), [language]);
 
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState("dashboard");
@@ -289,13 +328,13 @@ export default function App() {
   useEffect(() => {
     if (!ready || !session) return;
     const payload = { profile, recipes, foodlog, weightlog, customIngredients };
-    const t = setTimeout(() => {
+    const saveTimer = setTimeout(() => {
       supabase
         .from("user_data")
         .upsert({ user_id: session.user.id, data: payload, updated_at: new Date().toISOString() })
         .then(({ error }) => { if (error) console.error("Failed to save your data:", error); });
     }, 600);
-    return () => clearTimeout(t);
+    return () => clearTimeout(saveTimer);
   }, [profile, recipes, foodlog, weightlog, customIngredients, ready, session]);
 
   const allIngredients = useMemo(() => {
@@ -338,21 +377,21 @@ export default function App() {
   if (session === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#EFE7D6] text-[#2B2620]" style={{ fontFamily: sans }}>
-        Loading…
+        {t("loading.checking")}
       </div>
     );
   }
 
   // Not logged in — show the login/register screen
   if (!session) {
-    return <AuthScreen />;
+    return <AuthScreen lang={language} setLang={setLanguage} />;
   }
 
   // Logged in, but this user's data hasn't loaded from Supabase yet
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#EFE7D6] text-[#2B2620]" style={{ fontFamily: sans }}>
-        Loading your ledger…
+        {t("loading.ledger")}
       </div>
     );
   }
@@ -393,9 +432,9 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl tracking-tight leading-none" style={{ fontFamily: serif, fontWeight: 700 }}>
-                NutriNotes
+                {t("app.title")}
               </h1>
-              <p className="text-[11px] sm:text-xs text-[#8A8270] mt-1 tracking-wide">A plan that fits your pan</p>
+              <p className="text-[11px] sm:text-xs text-[#8A8270] mt-1 tracking-wide">{t("header.tagline")}</p>
             </div>
           </div>
 
@@ -404,36 +443,37 @@ export default function App() {
               <div className="flex gap-1.5 items-center bg-[#FFFDF7] border border-[#2B2620] px-2.5 py-1">
                 <Flame size={15} style={{ color: TAB_COLORS[tab] }} />
                 <span style={{ fontFamily: mono }} className="text-xs sm:text-sm font-medium">
-                  {fmt(targets.target)} kcal/day target
+                  {fmt(targets.target)} {t("header.kcalPerDay")}
                 </span>
               </div>
             )}
+            <LanguageSwitcher language={language} setLanguage={setLanguage} />
             <button
               onClick={() => supabase.auth.signOut()}
               className="text-xs underline text-[#8A8270] hover:text-[#2B2620] px-1"
               style={{ fontFamily: sans }}
             >
-              Sign out
+              {t("header.signOut")}
             </button>
           </div>
         </div>
         <nav className="max-w-5xl mx-auto flex gap-0.5 mt-5 overflow-x-auto">
-          <Tab active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={TrendingDown} color={TAB_COLORS.dashboard}>Dashboard</Tab>
-          <Tab active={tab === "recipes"} onClick={() => setTab("recipes")} icon={ChefHat} color={TAB_COLORS.recipes}>Recipes</Tab>
-          <Tab active={tab === "log"} onClick={() => setTab("log")} icon={Utensils} color={TAB_COLORS.log}>Food Log</Tab>
-          <Tab active={tab === "weight"} onClick={() => setTab("weight")} icon={Scale} color={TAB_COLORS.weight}>Weight</Tab>
-          <Tab active={tab === "plan"} onClick={() => setTab("plan")} icon={CalendarDays} color={TAB_COLORS.plan}>Weekly Plan</Tab>
-          <Tab active={tab === "profile"} onClick={() => setTab("profile")} icon={User} color={TAB_COLORS.profile}>Profile</Tab>
+          <Tab active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={TrendingDown} color={TAB_COLORS.dashboard}>{t("nav.dashboard")}</Tab>
+          <Tab active={tab === "recipes"} onClick={() => setTab("recipes")} icon={ChefHat} color={TAB_COLORS.recipes}>{t("nav.recipes")}</Tab>
+          <Tab active={tab === "log"} onClick={() => setTab("log")} icon={Utensils} color={TAB_COLORS.log}>{t("nav.log")}</Tab>
+          <Tab active={tab === "weight"} onClick={() => setTab("weight")} icon={Scale} color={TAB_COLORS.weight}>{t("nav.weight")}</Tab>
+          <Tab active={tab === "plan"} onClick={() => setTab("plan")} icon={CalendarDays} color={TAB_COLORS.plan}>{t("nav.plan")}</Tab>
+          <Tab active={tab === "profile"} onClick={() => setTab("profile")} icon={User} color={TAB_COLORS.profile}>{t("nav.profile")}</Tab>
         </nav>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-5 py-5 sm:py-6">
-        {tab === "profile" && <ProfileTab profile={profile} setProfile={setProfile} targets={targets} />}
+        {tab === "profile" && <ProfileTab profile={profile} setProfile={setProfile} targets={targets} t={t} />}
         {tab === "dashboard" && (
-          <DashboardTab profile={profile} targets={targets} foodlog={foodlog} weightlog={weightlog} todaysTotals={todaysTotals} logDate={logDate} />
+          <DashboardTab profile={profile} targets={targets} foodlog={foodlog} weightlog={weightlog} todaysTotals={todaysTotals} logDate={logDate} t={t} />
         )}
         {tab === "recipes" && (
-          <RecipesTab recipes={recipes} setRecipes={setRecipes} allIngredients={allIngredients} addCustomIngredient={addCustomIngredient} />
+          <RecipesTab recipes={recipes} setRecipes={setRecipes} allIngredients={allIngredients} addCustomIngredient={addCustomIngredient} t={t} />
         )}
         {tab === "log" && (
           <LogTab
@@ -445,20 +485,21 @@ export default function App() {
             recipes={recipes}
             addLogEntry={addLogEntry}
             removeLogEntry={removeLogEntry}
+            t={t}
           />
         )}
-        {tab === "weight" && <WeightTab weightlog={weightlog} setWeightlog={setWeightlog} profile={profile} setProfile={setProfile} />}
-        {tab === "plan" && <PlanTab recipes={recipes} targets={targets} />}
+        {tab === "weight" && <WeightTab weightlog={weightlog} setWeightlog={setWeightlog} profile={profile} setProfile={setProfile} t={t} />}
+        {tab === "plan" && <PlanTab recipes={recipes} targets={targets} t={t} />}
       </main>
       <footer className="text-center text-[10px] text-[#8A8270] pb-6 pt-2 px-4">
-        Not medical advice — for guidance on weight loss, talk with a doctor or dietitian.
+        {t("footer.disclaimer")}
       </footer>
     </div>
   );
 }
 
 // ---------- Profile Tab ----------
-function ProfileTab({ profile, setProfile, targets }) {
+function ProfileTab({ profile, setProfile, targets, t }) {
   const [form, setForm] = useState(
     profile || {
       name: "",
@@ -478,24 +519,24 @@ function ProfileTab({ profile, setProfile, targets }) {
   return (
     <div className="grid lg:grid-cols-2 gap-5 sm:gap-6">
       <Card className="p-4 sm:p-5" accent={C.plum}>
-        <h2 className="text-lg mb-4" style={{ fontFamily: serif, fontWeight: 600 }}>Your details</h2>
+        <h2 className="text-lg mb-4" style={{ fontFamily: serif, fontWeight: 600 }}>{t("profile.yourDetails")}</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Name" className="col-span-2 sm:col-span-1">
+          <Field label={t("profile.name")} className="col-span-2 sm:col-span-1">
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Cosmin" />
           </Field>
-          <Field label="Sex (for BMR formula)" className="col-span-2 sm:col-span-1">
+          <Field label={t("profile.sex")} className="col-span-2 sm:col-span-1">
             <select className={inputCls} value={form.sex} onChange={(e) => set("sex", e.target.value)}>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
+              <option value="male">{t("profile.male")}</option>
+              <option value="female">{t("profile.female")}</option>
             </select>
           </Field>
-          <Field label="Age (years)"><input type="number" className={inputCls} value={form.age} onChange={(e) => set("age", +e.target.value)} /></Field>
-          <Field label="Height (cm)"><input type="number" className={inputCls} value={form.heightCm} onChange={(e) => set("heightCm", +e.target.value)} /></Field>
-          <Field label="Current weight (kg)"><input type="number" step="0.1" className={inputCls} value={form.weightKg} onChange={(e) => set("weightKg", +e.target.value)} /></Field>
-          <Field label="Target weight (kg)"><input type="number" step="0.1" className={inputCls} value={form.targetWeightKg} onChange={(e) => set("targetWeightKg", +e.target.value)} /></Field>
+          <Field label={t("profile.age")}><input type="number" className={inputCls} value={form.age} onChange={(e) => set("age", +e.target.value)} /></Field>
+          <Field label={t("profile.height")}><input type="number" className={inputCls} value={form.heightCm} onChange={(e) => set("heightCm", +e.target.value)} /></Field>
+          <Field label={t("profile.currentWeight")}><input type="number" step="0.1" className={inputCls} value={form.weightKg} onChange={(e) => set("weightKg", +e.target.value)} /></Field>
+          <Field label={t("profile.targetWeight")}><input type="number" step="0.1" className={inputCls} value={form.targetWeightKg} onChange={(e) => set("targetWeightKg", +e.target.value)} /></Field>
         </div>
         <div className="mt-3">
-          <Field label="Activity level">
+          <Field label={t("profile.activityLevel")}>
             <div className="grid gap-1.5 mt-1">
               {ACTIVITY.map((a) => (
                 <button
@@ -505,7 +546,7 @@ function ProfileTab({ profile, setProfile, targets }) {
                     form.activity === a.id ? "border-[#B23A0E] bg-[#F3E7D8]" : "border-[#D8CFB8]"
                   }`}
                 >
-                  <span className="truncate">{a.label} <span className="text-[#8A8270] text-xs">— {a.sub}</span></span>
+                  <span className="truncate">{t(`activity.${a.id}`)} <span className="text-[#8A8270] text-xs">— {t(`activity.${a.id}.sub`)}</span></span>
                   {form.activity === a.id && <Check size={14} className="text-[#B23A0E] shrink-0" />}
                 </button>
               ))}
@@ -513,37 +554,37 @@ function ProfileTab({ profile, setProfile, targets }) {
           </Field>
         </div>
         <div className="mt-3">
-          <Field label={`Goal pace: ${fmt(form.goalRateKgWeek, 2)} kg/week`}>
+          <Field label={t("profile.goalPaceLabel", { rate: fmt(form.goalRateKgWeek, 2) })}>
             <input type="range" min="0" max="1" step="0.05" value={form.goalRateKgWeek} onChange={(e) => set("goalRateKgWeek", +e.target.value)} className="w-full" />
           </Field>
-          <p className="text-[11px] text-[#8A8270] mt-1">0.25–0.75 kg/week is a commonly sustainable range.</p>
+          <p className="text-[11px] text-[#8A8270] mt-1">{t("profile.goalPaceHint")}</p>
         </div>
         <Button className="mt-4 w-full sm:w-auto" onClick={() => setProfile(form)} color={C.plum}>
-          <Check size={14} /> Save profile
+          <Check size={14} /> {t("profile.saveProfile")}
         </Button>
       </Card>
 
       <Card className="p-4 sm:p-5" accent={C.plum}>
-        <h2 className="text-lg mb-4" style={{ fontFamily: serif, fontWeight: 600 }}>Your daily targets</h2>
+        <h2 className="text-lg mb-4" style={{ fontFamily: serif, fontWeight: 600 }}>{t("profile.yourTargets")}</h2>
         {liveTargets ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
-              <Stat label="BMR" value={fmt(liveTargets.bmr)} unit="kcal" bar={C.blue} />
-              <Stat label="Maintenance (TDEE)" value={fmt(liveTargets.tdee)} unit="kcal" bar={C.teal} />
-              <Stat label="Daily target" value={fmt(liveTargets.target)} unit="kcal" accent={C.rust} bar={C.rust} />
-              <Stat label="Est. time to goal" value={liveTargets.weeksToGoal ? fmt(liveTargets.weeksToGoal, 0) : "—"} unit="weeks" bar={C.sage} />
+              <Stat label={t("stat.bmr")} value={fmt(liveTargets.bmr)} unit="kcal" bar={C.blue} />
+              <Stat label={t("stat.tdee")} value={fmt(liveTargets.tdee)} unit="kcal" bar={C.teal} />
+              <Stat label={t("stat.dailyTarget")} value={fmt(liveTargets.target)} unit="kcal" accent={C.rust} bar={C.rust} />
+              <Stat label={t("stat.timeToGoal")} value={liveTargets.weeksToGoal ? fmt(liveTargets.weeksToGoal, 0) : "—"} unit={t("units.weeks")} bar={C.sage} />
             </div>
             {liveTargets.wasFloored && (
               <p className="text-[11px] text-[#B23A0E] border border-[#B23A0E] px-2 py-1.5">
-                Your requested pace would drop you below a safe minimum, so your target's been raised to a safer floor.
+                {t("profile.flooredWarning")}
               </p>
             )}
             <div className="flex justify-center sm:justify-start">
-              <NutritionLabel kcal={liveTargets.target} protein={liveTargets.proteinG} carbs={liveTargets.carbsG} fat={liveTargets.fatG} servingLabel="your daily target" />
+              <NutritionLabel kcal={liveTargets.target} protein={liveTargets.proteinG} carbs={liveTargets.carbsG} fat={liveTargets.fatG} servingLabel={t("nutrition.yourDailyTarget")} t={t} />
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[#8A8270]">Fill in your details to see targets.</p>
+          <p className="text-sm text-[#8A8270]">{t("profile.fillDetails")}</p>
         )}
       </Card>
     </div>
@@ -577,7 +618,7 @@ function perServing(recipe) {
   return { kcal: t.kcal / s, protein: t.protein / s, carbs: t.carbs / s, fat: t.fat / s };
 }
 
-function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient }) {
+function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient, t }) {
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("");
 
@@ -593,20 +634,20 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient }
 
   if (editing) {
     return (
-      <RecipeEditor recipe={editing} onSave={save} onCancel={() => setEditing(null)} allIngredients={allIngredients} addCustomIngredient={addCustomIngredient} />
+      <RecipeEditor recipe={editing} onSave={save} onCancel={() => setEditing(null)} allIngredients={allIngredients} addCustomIngredient={addCustomIngredient} t={t} />
     );
   }
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
-        <input className={inputCls + " sm:max-w-xs"} placeholder="Search recipes…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <Button onClick={() => setEditing(emptyRecipe())} className="w-full sm:w-auto" color={C.amber}><Plus size={14} /> New recipe</Button>
+        <input className={inputCls + " sm:max-w-xs"} placeholder={t("recipes.searchPlaceholder")} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <Button onClick={() => setEditing(emptyRecipe())} className="w-full sm:w-auto" color={C.amber}><Plus size={14} /> {t("recipes.newRecipe")}</Button>
       </div>
       {filtered.length === 0 && (
         <div className="border border-dashed border-[#D8CFB8] px-4 py-8 text-center">
           <ChefHat size={22} className="mx-auto text-[#8A8270] mb-2" />
-          <p className="text-sm text-[#8A8270]">{recipes.length === 0 ? "Your recipe box is empty — add the first card." : "No recipes match that search."}</p>
+          <p className="text-sm text-[#8A8270]">{recipes.length === 0 ? t("recipes.emptyBox") : t("recipes.noMatch")}</p>
         </div>
       )}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -621,23 +662,23 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient }
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                   <span className="text-[10px] .text-[#8A8270]" style={{ fontFamily: mono }}>No. {String(idx + 1).padStart(3, "0")}</span>
-                  <h3 className="text-base truncate" style={{ fontFamily: serif, fontWeight: 600 }}>{r.name || "Untitled"}</h3>
+                  <h3 className="text-base truncate" style={{ fontFamily: serif, fontWeight: 600 }}>{r.name || t("recipes.untitled")}</h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-[11px] text-[#8A8270] uppercase tracking-wide truncate">{r.cuisine || "—"}</span>
                     <span
                       className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 shrink-0"
                       style={{ background: `${MEAL_COLORS[r.mealType]}20`, color: MEAL_COLORS[r.mealType] }}
                     >
-                      {r.mealType}
+                      {t(`meal.${r.mealType}`)}
                     </span>
                   </div>
                 </div>
                 <span style={{ fontFamily: mono }} className="text-sm text-[#B23A0E] shrink-0">{fmt(ps.kcal)} kcal</span>
               </div>
-              <p className="text-[11px] text-[#8A8270]">{r.servings} servings · P {fmt(ps.protein)}g · C {fmt(ps.carbs)}g · F {fmt(ps.fat)}g</p>
+              <p className="text-[11px] text-[#8A8270]">{r.servings} {t("recipes.servings")} · {t("abbrev.protein")} {fmt(ps.protein)}g · {t("abbrev.carbs")} {fmt(ps.carbs)}g · {t("abbrev.fat")} {fmt(ps.fat)}g</p>
               <div className="flex gap-2 mt-1">
-                <Button variant="ghost" onClick={() => setEditing(r)} className="flex-1 sm:flex-initial">Edit</Button>
-                <Button variant="text" onClick={() => remove(r.id)}><Trash2 size={13} /> Delete</Button>
+                <Button variant="ghost" onClick={() => setEditing(r)} className="flex-1 sm:flex-initial">{t("recipes.edit")}</Button>
+                <Button variant="text" onClick={() => remove(r.id)}><Trash2 size={13} /> {t("recipes.delete")}</Button>
               </div>
             </Card>
           );
@@ -647,11 +688,11 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient }
   );
 }
 
-function IngredientRow({ ing, isKnown, savedFlash, onChange, onSave, onRemove }) {
+function IngredientRow({ ing, isKnown, savedFlash, onChange, onSave, onRemove, t }) {
   return (
     <>
       <div className="hidden sm:grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_auto_auto] gap-2 items-center">
-        <input className={inputCls} value={ing.name} onChange={(e) => onChange("name", e.target.value)} placeholder="e.g. chicken breast" list="ingredient-options" />
+        <input className={inputCls} value={ing.name} onChange={(e) => onChange("name", e.target.value)} placeholder={t("editor.ingredientPlaceholderDesktop")} list="ingredient-options" />
         <input type="number" className={inputCls} value={ing.grams} onChange={(e) => onChange("grams", +e.target.value)} />
         <input type="number" className={inputCls} value={ing.kcal100} onChange={(e) => onChange("kcal100", +e.target.value)} />
         <input type="number" className={inputCls} value={ing.protein100} onChange={(e) => onChange("protein100", +e.target.value)} />
@@ -668,27 +709,27 @@ function IngredientRow({ ing, isKnown, savedFlash, onChange, onSave, onRemove })
       </div>
 
       <div className="sm:hidden border border-[#D8CFB8] bg-[#FFFDF7] p-3 flex flex-col gap-2">
-        <input className={inputCls} value={ing.name} onChange={(e) => onChange("name", e.target.value)} placeholder="Ingredient name" list="ingredient-options" />
+        <input className={inputCls} value={ing.name} onChange={(e) => onChange("name", e.target.value)} placeholder={t("editor.ingredientPlaceholderMobile")} list="ingredient-options" />
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Grams"><input type="number" className={inputCls} value={ing.grams} onChange={(e) => onChange("grams", +e.target.value)} /></Field>
-          <Field label="Kcal / 100g"><input type="number" className={inputCls} value={ing.kcal100} onChange={(e) => onChange("kcal100", +e.target.value)} /></Field>
-          <Field label="Protein / 100g"><input type="number" className={inputCls} value={ing.protein100} onChange={(e) => onChange("protein100", +e.target.value)} /></Field>
-          <Field label="Carbs / 100g"><input type="number" className={inputCls} value={ing.carbs100} onChange={(e) => onChange("carbs100", +e.target.value)} /></Field>
-          <Field label="Fat / 100g" className="col-span-2"><input type="number" className={inputCls} value={ing.fat100} onChange={(e) => onChange("fat100", +e.target.value)} /></Field>
+          <Field label={t("editor.grams")}><input type="number" className={inputCls} value={ing.grams} onChange={(e) => onChange("grams", +e.target.value)} /></Field>
+          <Field label={t("editor.kcal100")}><input type="number" className={inputCls} value={ing.kcal100} onChange={(e) => onChange("kcal100", +e.target.value)} /></Field>
+          <Field label={t("editor.prot100")}><input type="number" className={inputCls} value={ing.protein100} onChange={(e) => onChange("protein100", +e.target.value)} /></Field>
+          <Field label={t("editor.carb100")}><input type="number" className={inputCls} value={ing.carbs100} onChange={(e) => onChange("carbs100", +e.target.value)} /></Field>
+          <Field label={t("editor.fat100")} className="col-span-2"><input type="number" className={inputCls} value={ing.fat100} onChange={(e) => onChange("fat100", +e.target.value)} /></Field>
         </div>
         <div className="flex gap-2 pt-1">
           <Button variant="ghost" onClick={onSave} disabled={!ing.name.trim()} className="flex-1">
             {savedFlash ? <BookmarkCheck size={14} className="text-[#8A9A5B]" /> : <BookmarkPlus size={14} />}
-            {savedFlash ? "Saved" : "Save ingredient"}
+            {savedFlash ? t("editor.saved") : t("editor.saveIngredient")}
           </Button>
-          <Button variant="text" onClick={onRemove}><Trash2 size={13} /> Remove</Button>
+          <Button variant="text" onClick={onRemove}><Trash2 size={13} /> {t("editor.remove")}</Button>
         </div>
       </div>
     </>
   );
 }
 
-function RecipeEditor({ recipe, onSave, onCancel, allIngredients, addCustomIngredient }) {
+function RecipeEditor({ recipe, onSave, onCancel, allIngredients, addCustomIngredient, t }) {
   const [r, setR] = useState(recipe);
   const [savedFlash, setSavedFlash] = useState(null);
   const set = (k, v) => setR((prev) => ({ ...prev, [k]: v }));
@@ -734,31 +775,31 @@ function RecipeEditor({ recipe, onSave, onCancel, allIngredients, addCustomIngre
         {allIngredients.map((ing) => (<option key={ing.name} value={ing.name} />))}
       </datalist>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg" style={{ fontFamily: serif, fontWeight: 600 }}>{recipe.name ? "Edit recipe" : "New recipe"}</h2>
+        <h2 className="text-lg" style={{ fontFamily: serif, fontWeight: 600 }}>{recipe.name ? t("editor.editRecipe") : t("editor.newRecipe")}</h2>
         <button onClick={onCancel} className="text-[#8A8270] hover:text-[#2B2620]"><X size={18} /></button>
       </div>
       <div className="grid sm:grid-cols-4 gap-3 mb-4">
-        <Field label="Recipe Name" className="sm:col-span-2">
-          <input className={inputCls} value={r.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Grandma's Lentil Soup" />
+        <Field label={t("editor.recipeName")} className="sm:col-span-2">
+          <input className={inputCls} value={r.name} onChange={(e) => set("name", e.target.value)} placeholder={t("editor.recipeNamePlaceholder")} />
         </Field>
-        <Field label="Cuisine">
-          <input className={inputCls} value={r.cuisine} onChange={(e) => set("cuisine", e.target.value)} placeholder="e.g. Mediterranean" />
+        <Field label={t("editor.cuisine")}>
+          <input className={inputCls} value={r.cuisine} onChange={(e) => set("cuisine", e.target.value)} placeholder={t("editor.cuisinePlaceholder")} />
         </Field>
-        <Field label="Meal Category">
+        <Field label={t("editor.mealCategory")}>
           <select className={inputCls} value={r.mealType} onChange={(e) => set("mealType", e.target.value)}>
-            {MEAL_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
+            {MEAL_TYPES.map(m => <option key={m} value={m}>{t(`meal.${m}`)}</option>)}
           </select>
         </Field>
       </div>
 
       <div className="border-t border-[#D8CFB8] pt-3">
         <div className="hidden sm:grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_auto_auto] gap-2 text-[10px] uppercase tracking-wider text-[#8A8270] mb-1 px-1">
-          <span>Ingredient Name</span>
-          <span>Grams</span>
-          <span>Kcal/100g</span>
-          <span>Prot/100g</span>
-          <span>Carb/100g</span>
-          <span>Fat/100g</span>
+          <span>{t("editor.ingredientName")}</span>
+          <span>{t("editor.grams")}</span>
+          <span>{t("editor.kcal100")}</span>
+          <span>{t("editor.prot100")}</span>
+          <span>{t("editor.carb100")}</span>
+          <span>{t("editor.fat100")}</span>
           <span />
           <span />
         </div>
@@ -772,24 +813,25 @@ function RecipeEditor({ recipe, onSave, onCancel, allIngredients, addCustomIngre
               onChange={(k, v) => setIng(ing.id, k, v)}
               onSave={() => saveIngredientToLibrary(ing)}
               onRemove={() => removeIng(ing.id)}
+              t={t}
             />
           ))}
         </div>
-        <Button variant="ghost" onClick={addIng} className="mt-3 w-full sm:w-auto"><Plus size={14} /> Add ingredient line</Button>
+        <Button variant="ghost" onClick={addIng} className="mt-3 w-full sm:w-auto"><Plus size={14} /> {t("editor.addIngredientLine")}</Button>
       </div>
 
       <div className="mt-5 border-t border-[#2B2620] pt-4 flex flex-col md:flex-row justify-between items-center md:items-start gap-4">
         <div className="flex flex-wrap gap-2 text-xs text-[#8A8270]">
-          <div className="px-3 py-1.5 bg-[#F4EEDD] border border-[#D8CFB8]">Total: {fmt(totals.kcal)} kcal · P {fmt(totals.protein)}g · C {fmt(totals.carbs)}g · F {fmt(totals.fat)}g</div>
+          <div className="px-3 py-1.5 bg-[#F4EEDD] border border-[#D8CFB8]">{t("editor.total")}: {fmt(totals.kcal)} kcal · {t("abbrev.protein")} {fmt(totals.protein)}g · {t("abbrev.carbs")} {fmt(totals.carbs)}g · {t("abbrev.fat")} {fmt(totals.fat)}g</div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFDF7] border border-[#2B2620]">
-            <Field label="Servings count" className="flex-row items-center gap-2"><input type="number" min="1" className={inputCls + " w-16 min-h-[28px] py-0"} value={r.servings} onChange={(e) => set("servings", Math.max(1, +e.target.value))} /></Field>
+            <Field label={t("editor.servingsCount")} className="flex-row items-center gap-2"><input type="number" min="1" className={inputCls + " w-16 min-h-[28px] py-0"} value={r.servings} onChange={(e) => set("servings", Math.max(1, +e.target.value))} /></Field>
           </div>
         </div>
         <div className="flex items-center gap-4 shrink-0">
-          <NutritionLabel kcal={ps.kcal} protein={ps.protein} carbs={ps.carbs} fat={ps.fat} servingLabel="calculated per serving" />
+          <NutritionLabel kcal={ps.kcal} protein={ps.protein} carbs={ps.carbs} fat={ps.fat} servingLabel={t("editor.perServingLabel")} t={t} />
           <div className="flex flex-col gap-2">
-            <Button onClick={() => onSave(r)} disabled={!r.name.trim() || r.ingredients.length === 0} color={C.amber}><Check size={14} /> Save Recipe</Button>
-            <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+            <Button onClick={() => onSave(r)} disabled={!r.name.trim() || r.ingredients.length === 0} color={C.amber}><Check size={14} /> {t("editor.saveRecipe")}</Button>
+            <Button variant="ghost" onClick={onCancel}>{t("editor.cancel")}</Button>
           </div>
         </div>
       </div>
@@ -798,7 +840,7 @@ function RecipeEditor({ recipe, onSave, onCancel, allIngredients, addCustomIngre
 }
 
 // ---------- Dashboard Tab ----------
-function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals }) {
+function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals, t }) {
   const recentWeight = useMemo(() => {
     if (!weightlog || weightlog.length === 0) return profile?.weightKg || 0;
     return [...weightlog].sort((a,b) => b.date.localeCompare(a.date))[0].weightKg;
@@ -821,31 +863,31 @@ function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals }) {
     <div className="space-y-5">
       <div className="grid md:grid-cols-3 gap-4 items-stretch">
         <Card className="p-4 flex flex-col items-center justify-center text-center" accent={C.rust}>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-3">Today's Intake Progress</h3>
-          <CalorieRing value={todaysTotals.kcal} target={targets?.target || 2000} />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-3">{t("dashboard.intakeProgress")}</h3>
+          <CalorieRing value={todaysTotals.kcal} target={targets?.target || 2000} t={t} />
         </Card>
         <Card className="p-4 grid grid-cols-2 gap-2" accent={C.teal}>
-          <div className="col-span-2 text-center border-b border-[#D8CFB8] pb-1 mb-1"><span className="text-xs uppercase tracking-wider text-[#8A8270]">Macro Breakdown</span></div>
-          <Stat label="Protein" value={fmt(todaysTotals.protein)} unit={`/ ${fmt(targets?.proteinG || 130)}g`} bar={MACRO_COLORS.protein} />
-          <Stat label="Carbs" value={fmt(todaysTotals.carbs)} unit={`/ ${fmt(targets?.carbsG || 200)}g`} bar={MACRO_COLORS.carbs} />
-          <Stat label="Fat" value={fmt(todaysTotals.fat)} unit={`/ ${fmt(targets?.fatG || 65)}g`} bar={MACRO_COLORS.fat} />
-          <Stat label="Current Weight" value={fmt(recentWeight, 1)} unit="kg" bar={C.blue} />
+          <div className="col-span-2 text-center border-b border-[#D8CFB8] pb-1 mb-1"><span className="text-xs uppercase tracking-wider text-[#8A8270]">{t("dashboard.macroBreakdown")}</span></div>
+          <Stat label={t("stat.protein")} value={fmt(todaysTotals.protein)} unit={`/ ${fmt(targets?.proteinG || 130)}g`} bar={MACRO_COLORS.protein} />
+          <Stat label={t("stat.carbs")} value={fmt(todaysTotals.carbs)} unit={`/ ${fmt(targets?.carbsG || 200)}g`} bar={MACRO_COLORS.carbs} />
+          <Stat label={t("stat.fat")} value={fmt(todaysTotals.fat)} unit={`/ ${fmt(targets?.fatG || 65)}g`} bar={MACRO_COLORS.fat} />
+          <Stat label={t("stat.currentWeight")} value={fmt(recentWeight, 1)} unit="kg" bar={C.blue} />
         </Card>
         <Card className="p-4 flex flex-col justify-between" accent={C.blue}>
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-2">Target Metrics</h3>
-            <p className="text-sm italic text-[#2B2620]">"The ledger never misleads the cook."</p>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-2">{t("dashboard.targetMetrics")}</h3>
+            <p className="text-sm italic text-[#2B2620]">"{t("dashboard.quote")}"</p>
           </div>
           <div className="mt-4 space-y-1 text-xs border-t border-[#D8CFB8] pt-2">
-            <div className="flex justify-between"><span>Maintenance TDEE:</span><span className="font-mono">{fmt(targets?.tdee || 2400)} kcal</span></div>
-            <div className="flex justify-between"><span>Active Deficit:</span><span className="font-mono">{targets ? fmt(targets.tdee - targets.target) : "0"} kcal</span></div>
-            <div className="flex justify-between"><span>Weekly Pace:</span><span className="font-mono">{profile?.goalRateKgWeek || "0.0"} kg</span></div>
+            <div className="flex justify-between"><span>{t("dashboard.maintenanceTdee")}</span><span className="font-mono">{fmt(targets?.tdee || 2400)} kcal</span></div>
+            <div className="flex justify-between"><span>{t("dashboard.activeDeficit")}</span><span className="font-mono">{targets ? fmt(targets.tdee - targets.target) : "0"} kcal</span></div>
+            <div className="flex justify-between"><span>{t("dashboard.weeklyPace")}</span><span className="font-mono">{profile?.goalRateKgWeek || "0.0"} kg</span></div>
           </div>
         </Card>
       </div>
 
       <Card className="p-4" accent={C.lineStrong}>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-3">Past 7 Days Caloric History</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A8270] mb-3">{t("dashboard.past7days")}</h3>
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
@@ -858,7 +900,7 @@ function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals }) {
                   <Cell key={`cell-${index}`} fill={targets && entry.kcal > targets.target ? C.rustDark : C.rust} />
                 ))}
               </Bar>
-              {targets && <ReferenceLine y={targets.target} stroke={C.rustDark} strokeDasharray="5 5" label={{ value: 'Target', position: 'insideTopRight', fill: C.rustDark, fontSize: 10 }} />}
+              {targets && <ReferenceLine y={targets.target} stroke={C.rustDark} strokeDasharray="5 5" label={{ value: t("common.target"), position: 'insideTopRight', fill: C.rustDark, fontSize: 10 }} />}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -868,7 +910,7 @@ function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals }) {
 }
 
 // ---------- Food Log Tab ----------
-function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLogEntry, removeLogEntry }) {
+function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLogEntry, removeLogEntry, t }) {
   const [activeMeal, setActiveMeal] = useState("breakfast");
   const [selectedRecipeId, setSelectedRecipeId] = useState("");
   const [customKcal, setCustomKcal] = useState("");
@@ -908,48 +950,48 @@ function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLog
       <div className="space-y-4 md:col-span-2">
         <Card className="p-4" accent={C.teal}>
           <div className="flex gap-2 items-center mb-3">
-            <Field label="Target Log Sheet Date" className="flex-1">
+            <Field label={t("log.targetDate")} className="flex-1">
               <input type="date" className={inputCls} value={logDate} onChange={(e) => setLogDate(e.target.value)} />
             </Field>
           </div>
           <div className="flex border-b border-[#D8CFB8] mb-3">
             {MEAL_TYPES.map(m => (
-              <button key={m} onClick={() => setActiveMeal(m)} className={`flex-1 py-1.5 text-xs capitalize font-medium border-b-2 tracking-wide ${activeMeal === m ? "text-[#2B2620] border-[#2B2620]" : "text-[#8A8270] border-transparent"}`}>{m}</button>
+              <button key={m} onClick={() => setActiveMeal(m)} className={`flex-1 py-1.5 text-xs capitalize font-medium border-b-2 tracking-wide ${activeMeal === m ? "text-[#2B2620] border-[#2B2620]" : "text-[#8A8270] border-transparent"}`}>{t(`meal.${m}`)}</button>
             ))}
           </div>
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row gap-2 items-end">
-              <Field label="Log Card from Recipe Library" className="flex-1">
+              <Field label={t("log.recipeLibrary")} className="flex-1">
                 <select className={inputCls} value={selectedRecipeId} onChange={(e) => setSelectedRecipeId(e.target.value)}>
-                  <option value="">-- Choose a Recipe Card --</option>
+                  <option value="">{t("log.chooseRecipe")}</option>
                   {recipes.map(r => <option key={r.id} value={r.id}>{r.name} ({fmt(perServing(r).kcal)} kcal)</option>)}
                 </select>
               </Field>
-              <Button onClick={handleAddRecipe} disabled={!selectedRecipeId} color={C.teal} className="w-full sm:w-auto"><Plus size={14} /> Add Line</Button>
+              <Button onClick={handleAddRecipe} disabled={!selectedRecipeId} color={C.teal} className="w-full sm:w-auto"><Plus size={14} /> {t("log.addLine")}</Button>
             </div>
             <div className="border-t border-dashed border-[#D8CFB8] pt-3 flex flex-col sm:flex-row gap-2 items-end">
-              <Field label="Quick Add Line Item" className="flex-1">
-                <input className={inputCls} placeholder="e.g., Banana, Coffee" value={customName} onChange={(e) => setCustomName(e.target.value)} />
+              <Field label={t("log.quickAdd")} className="flex-1">
+                <input className={inputCls} placeholder={t("log.quickAddPlaceholder")} value={customName} onChange={(e) => setCustomName(e.target.value)} />
               </Field>
-              <Field label="Calories" className="w-full sm:w-24">
+              <Field label={t("log.calories")} className="w-full sm:w-24">
                 <input type="number" className={inputCls} placeholder="kcal" value={customKcal} onChange={(e) => setCustomKcal(e.target.value)} />
               </Field>
-              <Button onClick={handleAddCustom} disabled={!customName.trim() || !customKcal} color={C.teal} className="w-full sm:w-auto">Add</Button>
+              <Button onClick={handleAddCustom} disabled={!customName.trim() || !customKcal} color={C.teal} className="w-full sm:w-auto">{t("log.add")}</Button>
             </div>
           </div>
         </Card>
 
         <Card className="p-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">Today's Log Entries</h3>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">{t("log.todaysEntries")}</h3>
           {entries.length === 0 ? (
-            <p className="text-sm text-center py-6 text-[#8A8270] border border-dashed border-[#D8CFB8]">No food logged yet for this date ledger.</p>
+            <p className="text-sm text-center py-6 text-[#8A8270] border border-dashed border-[#D8CFB8]">{t("log.noEntries")}</p>
           ) : (
             <div className="divide-y divide-[#D8CFB8]">
               {entries.map(e => (
                 <div key={e.id} className="py-2 flex justify-between items-center text-sm gap-2">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{e.name}</div>
-                    <div className="text-[10px] uppercase text-[#8A8270] tracking-wide">{e.mealType}</div>
+                    <div className="text-[10px] uppercase text-[#8A8270] tracking-wide">{t(`meal.${e.mealType}`)}</div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="font-mono text-xs text-[#B23A0E]">{fmt(e.kcal)} kcal</span>
@@ -964,7 +1006,7 @@ function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLog
 
       <div>
         <Card className="p-4 flex justify-center" accent={C.teal}>
-          <NutritionLabel kcal={totals.kcal} protein={totals.protein} carbs={totals.carbs} fat={totals.fat} servingLabel="accumulated daily aggregate" />
+          <NutritionLabel kcal={totals.kcal} protein={totals.protein} carbs={totals.carbs} fat={totals.fat} servingLabel={t("log.aggregate")} t={t} />
         </Card>
       </div>
     </div>
@@ -972,7 +1014,7 @@ function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLog
 }
 
 // ---------- Weight Tab ----------
-function WeightTab({ weightlog, setWeightlog, profile, setProfile }) {
+function WeightTab({ weightlog, setWeightlog, profile, setProfile, t }) {
   const [wInput, setWInput] = useState("");
   const [dInput, setDInput] = useState(todayStr());
 
@@ -995,18 +1037,18 @@ function WeightTab({ weightlog, setWeightlog, profile, setProfile }) {
   return (
     <div className="grid md:grid-cols-3 gap-5 items-start">
       <Card className="p-4" accent={C.blue}>
-        <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">Record Current Metric</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">{t("weight.recordMetric")}</h3>
         <div className="space-y-3">
-          <Field label="Log Date"><input type="date" className={inputCls} value={dInput} onChange={(e) => setDInput(e.target.value)} /></Field>
-          <Field label="Weight Ledger (kg)"><input type="number" step="0.1" className={inputCls} placeholder="e.g. 74.2" value={wInput} onChange={(e) => setWInput(e.target.value)} /></Field>
-          <Button onClick={addWeight} disabled={!wInput} color={C.blue} className="w-full"><Check size={14} /> Commit Entry</Button>
+          <Field label={t("weight.logDate")}><input type="date" className={inputCls} value={dInput} onChange={(e) => setDInput(e.target.value)} /></Field>
+          <Field label={t("weight.weightLedger")}><input type="number" step="0.1" className={inputCls} placeholder={t("weight.weightPlaceholder")} value={wInput} onChange={(e) => setWInput(e.target.value)} /></Field>
+          <Button onClick={addWeight} disabled={!wInput} color={C.blue} className="w-full"><Check size={14} /> {t("weight.commitEntry")}</Button>
         </div>
       </Card>
 
       <Card className="p-4 md:col-span-2">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">Historical Scale Progress</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-3">{t("weight.historicalProgress")}</h3>
         {weightlog.length === 0 ? (
-          <p className="text-sm text-center py-12 text-[#8A8270] border border-dashed border-[#D8CFB8]">No weight records committed yet.</p>
+          <p className="text-sm text-center py-12 text-[#8A8270] border border-dashed border-[#D8CFB8]">{t("weight.noRecords")}</p>
         ) : (
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -1020,7 +1062,7 @@ function WeightTab({ weightlog, setWeightlog, profile, setProfile }) {
                     y={profile.targetWeightKg}
                     stroke={C.sage}
                     strokeDasharray="5 5"
-                    label={{ value: "Goal", position: "insideTopRight", fill: C.sageDark, fontSize: 10 }}
+                    label={{ value: t("weight.goalLabel"), position: "insideTopRight", fill: C.sageDark, fontSize: 10 }}
                   />
                 )}
                 <Line type="monotone" dataKey="weightKg" stroke={C.blue} strokeWidth={2} activeDot={{ r: 6 }} />
@@ -1034,20 +1076,20 @@ function WeightTab({ weightlog, setWeightlog, profile, setProfile }) {
 }
 
 // ---------- Plan Tab ----------
-function PlanTab({ recipes, targets }) {
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+function PlanTab({ recipes, targets, t }) {
+  const dayKeys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
   return (
     <Card className="p-4" accent={C.sage}>
-      <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-2">Weekly Plan Manifest</h3>
-      <p className="text-xs text-[#8A8270] mb-4">Map your planned meals. Use your recipe inventory catalog to safely align with your target: <b>{targets ? fmt(targets.target) : "2000"} kcal</b>.</p>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-[#8A8270] mb-2">{t("plan.manifest")}</h3>
+      <p className="text-xs text-[#8A8270] mb-4">{t("plan.description", { target: targets ? fmt(targets.target) : "2000" })}</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {days.map(day => (
-          <div key={day} className="border border-[#D8CFB8] p-2.5 bg-[#FFFDF7] flex flex-col justify-between min-h-[100px]">
-            <span className="text-xs font-bold uppercase tracking-wider border-b border-[#D8CFB8] pb-1 mb-1 block">{day}</span>
+        {dayKeys.map(dayKey => (
+          <div key={dayKey} className="border border-[#D8CFB8] p-2.5 bg-[#FFFDF7] flex flex-col justify-between min-h-[100px]">
+            <span className="text-xs font-bold uppercase tracking-wider border-b border-[#D8CFB8] pb-1 mb-1 block">{t(`day.${dayKey}`)}</span>
             <div className="text-[11px] text-[#8A8270] italic space-y-1">
-              <div className="flex justify-between"><span>Breakfast:</span><span className="text-[#2B2620]">Planned</span></div>
-              <div className="flex justify-between"><span>Lunch:</span><span className="text-[#2B2620]">Planned</span></div>
-              <div className="flex justify-between"><span>Dinner:</span><span className="text-[#2B2620]">Planned</span></div>
+              <div className="flex justify-between"><span>{t("plan.breakfastRow")}</span><span className="text-[#2B2620]">{t("plan.plannedValue")}</span></div>
+              <div className="flex justify-between"><span>{t("plan.lunchRow")}</span><span className="text-[#2B2620]">{t("plan.plannedValue")}</span></div>
+              <div className="flex justify-between"><span>{t("plan.dinnerRow")}</span><span className="text-[#2B2620]">{t("plan.plannedValue")}</span></div>
             </div>
           </div>
         ))}

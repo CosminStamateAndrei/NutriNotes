@@ -79,6 +79,8 @@ export const TRANSLATIONS = {
     "recipes.edit": "Edit",
     "recipes.delete": "Delete",
     "recipes.untitled": "Untitled",
+    "recipes.builtin": "Built-in",
+    "recipes.builtinEditHint": "Editing a built-in recipe saves a personal copy.",
 
     "meal.breakfast": "breakfast",
     "meal.lunch": "lunch",
@@ -135,6 +137,11 @@ export const TRANSLATIONS = {
     "log.todaysEntries": "Today's Log Entries",
     "log.noEntries": "No food logged yet for this date ledger.",
     "log.aggregate": "accumulated daily aggregate",
+    "log.groupBuiltin": "Built-in recipes",
+    "log.groupMine": "My recipes",
+    "log.quickFoods": "Quick foods",
+    "log.chooseFood": "-- Choose a food --",
+    "log.quantity": "Qty",
 
     "weight.recordMetric": "Record Current Metric",
     "weight.logDate": "Log Date",
@@ -243,6 +250,8 @@ export const TRANSLATIONS = {
     "recipes.edit": "Editează",
     "recipes.delete": "Șterge",
     "recipes.untitled": "Fără nume",
+    "recipes.builtin": "Predefinită",
+    "recipes.builtinEditHint": "Editarea unei rețete predefinite salvează o copie personală.",
 
     "meal.breakfast": "mic dejun",
     "meal.lunch": "prânz",
@@ -299,6 +308,11 @@ export const TRANSLATIONS = {
     "log.todaysEntries": "Intrările de azi",
     "log.noEntries": "Niciun aliment înregistrat încă pentru această dată.",
     "log.aggregate": "total zilnic acumulat",
+    "log.groupBuiltin": "Rețete predefinite",
+    "log.groupMine": "Rețetele mele",
+    "log.quickFoods": "Alimente rapide",
+    "log.chooseFood": "-- Alege un aliment --",
+    "log.quantity": "Cant.",
 
     "weight.recordMetric": "Înregistrează măsurătoarea curentă",
     "weight.logDate": "Data înregistrării",
@@ -407,6 +421,8 @@ export const TRANSLATIONS = {
     "recipes.edit": "Bewerken",
     "recipes.delete": "Verwijderen",
     "recipes.untitled": "Naamloos",
+    "recipes.builtin": "Standaard",
+    "recipes.builtinEditHint": "Een standaardrecept bewerken slaat een persoonlijke kopie op.",
 
     "meal.breakfast": "ontbijt",
     "meal.lunch": "lunch",
@@ -463,6 +479,11 @@ export const TRANSLATIONS = {
     "log.todaysEntries": "Vandaag gelogde items",
     "log.noEntries": "Nog geen voeding gelogd voor deze datum.",
     "log.aggregate": "totaal van vandaag",
+    "log.groupBuiltin": "Standaardrecepten",
+    "log.groupMine": "Mijn recepten",
+    "log.quickFoods": "Snelle producten",
+    "log.chooseFood": "-- Kies een product --",
+    "log.quantity": "Aantal",
 
     "weight.recordMetric": "Huidige meting vastleggen",
     "weight.logDate": "Datum",

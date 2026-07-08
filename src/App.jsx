@@ -5,6 +5,7 @@ import { BUILTIN_INGREDIENTS } from "./ingredientsData";
 import { supabase } from "./supabaseClient";
 import AuthScreen from "./AuthScreen";
 import { translate, LANGUAGES } from "./i18n";
+import { BUILTIN_RECIPES, QUICK_FOODS } from "./builtinRecipes";
 
 // Import your custom app logo asset
 import logoIcon from "./assets/NutriNotesGood.png";
@@ -486,6 +487,7 @@ export default function App() {
             addLogEntry={addLogEntry}
             removeLogEntry={removeLogEntry}
             t={t}
+            language={language}
           />
         )}
         {tab === "weight" && <WeightTab weightlog={weightlog} setWeightlog={setWeightlog} profile={profile} setProfile={setProfile} t={t} />}
@@ -598,6 +600,14 @@ function emptyIngredient() {
 function emptyRecipe() {
   return { id: uid(), name: "", cuisine: "", mealType: "dinner", servings: 2, ingredients: [emptyIngredient()] };
 }
+function isBuiltinRecipe(r) {
+  return String(r.id).startsWith("builtin_");
+}
+// Editing a built-in recipe shouldn't modify the shared original —
+// clone it with fresh ids so saving creates the user's own copy.
+function cloneRecipe(r) {
+  return { ...r, id: uid(), ingredients: r.ingredients.map((i) => ({ ...i, id: uid() })) };
+}
 function recipeTotals(recipe) {
   return recipe.ingredients.reduce(
     (acc, ing) => {
@@ -630,7 +640,8 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient, 
     setEditing(null);
   };
   const remove = (id) => setRecipes((prev) => prev.filter((p) => p.id !== id));
-  const filtered = recipes.filter((r) => r.name.toLowerCase().includes(filter.toLowerCase()));
+  const combined = [...BUILTIN_RECIPES, ...recipes];
+  const filtered = combined.filter((r) => r.name.toLowerCase().includes(filter.toLowerCase()));
 
   if (editing) {
     return (
@@ -653,6 +664,7 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient, 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((r, idx) => {
           const ps = perServing(r);
+          const builtin = isBuiltinRecipe(r);
           return (
             <Card key={r.id} className="p-4 pt-5 flex flex-col gap-2 relative" style={{ borderLeft: `4px solid ${C.amber}` }}>
               <div className="absolute top-0 left-0 right-0 flex justify-center gap-10 -translate-y-1/2">
@@ -663,7 +675,7 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient, 
                 <div className="min-w-0">
                   <span className="text-[10px] .text-[#8A8270]" style={{ fontFamily: mono }}>No. {String(idx + 1).padStart(3, "0")}</span>
                   <h3 className="text-base truncate" style={{ fontFamily: serif, fontWeight: 600 }}>{r.name || t("recipes.untitled")}</h3>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <span className="text-[11px] text-[#8A8270] uppercase tracking-wide truncate">{r.cuisine || "—"}</span>
                     <span
                       className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 shrink-0"
@@ -671,14 +683,25 @@ function RecipesTab({ recipes, setRecipes, allIngredients, addCustomIngredient, 
                     >
                       {t(`meal.${r.mealType}`)}
                     </span>
+                    {builtin && (
+                      <span
+                        className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 shrink-0"
+                        style={{ background: `${C.ink}12`, color: C.muted, border: `1px solid ${C.line}` }}
+                        title={t("recipes.builtinEditHint")}
+                      >
+                        {t("recipes.builtin")}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span style={{ fontFamily: mono }} className="text-sm text-[#B23A0E] shrink-0">{fmt(ps.kcal)} kcal</span>
               </div>
               <p className="text-[11px] text-[#8A8270]">{r.servings} {t("recipes.servings")} · {t("abbrev.protein")} {fmt(ps.protein)}g · {t("abbrev.carbs")} {fmt(ps.carbs)}g · {t("abbrev.fat")} {fmt(ps.fat)}g</p>
               <div className="flex gap-2 mt-1">
-                <Button variant="ghost" onClick={() => setEditing(r)} className="flex-1 sm:flex-initial">{t("recipes.edit")}</Button>
-                <Button variant="text" onClick={() => remove(r.id)}><Trash2 size={13} /> {t("recipes.delete")}</Button>
+                <Button variant="ghost" onClick={() => setEditing(builtin ? cloneRecipe(r) : r)} className="flex-1 sm:flex-initial">{t("recipes.edit")}</Button>
+                {!builtin && (
+                  <Button variant="text" onClick={() => remove(r.id)}><Trash2 size={13} /> {t("recipes.delete")}</Button>
+                )}
               </div>
             </Card>
           );
@@ -910,14 +933,34 @@ function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals, t })
 }
 
 // ---------- Food Log Tab ----------
-function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLogEntry, removeLogEntry, t }) {
+function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLogEntry, removeLogEntry, t, language }) {
   const [activeMeal, setActiveMeal] = useState("breakfast");
   const [selectedRecipeId, setSelectedRecipeId] = useState("");
   const [customKcal, setCustomKcal] = useState("");
   const [customName, setCustomName] = useState("");
+  const [quickFoodId, setQuickFoodId] = useState("");
+  const [quickFoodQty, setQuickFoodQty] = useState(1);
+
+  const qfName = (qf) => qf.names[language] || qf.names.en;
+
+  const handleAddQuickFood = () => {
+    const qf = QUICK_FOODS.find((x) => x.id === quickFoodId);
+    if (!qf) return;
+    const q = +quickFoodQty || 1;
+    addLogEntry(logDate, {
+      name: q === 1 ? qfName(qf) : `${qfName(qf)} × ${q}`,
+      mealType: activeMeal,
+      kcal: qf.kcal * q,
+      protein: qf.protein * q,
+      carbs: qf.carbs * q,
+      fat: qf.fat * q,
+    });
+    setQuickFoodId("");
+    setQuickFoodQty(1);
+  };
 
   const handleAddRecipe = () => {
-    const rc = recipes.find(r => r.id === selectedRecipeId);
+    const rc = [...BUILTIN_RECIPES, ...recipes].find(r => r.id === selectedRecipeId);
     if (!rc) return;
     const ps = perServing(rc);
     addLogEntry(logDate, {
@@ -964,10 +1007,29 @@ function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLog
               <Field label={t("log.recipeLibrary")} className="flex-1">
                 <select className={inputCls} value={selectedRecipeId} onChange={(e) => setSelectedRecipeId(e.target.value)}>
                   <option value="">{t("log.chooseRecipe")}</option>
-                  {recipes.map(r => <option key={r.id} value={r.id}>{r.name} ({fmt(perServing(r).kcal)} kcal)</option>)}
+                  <optgroup label={t("log.groupBuiltin")}>
+                    {BUILTIN_RECIPES.map(r => <option key={r.id} value={r.id}>{r.name} ({fmt(perServing(r).kcal)} kcal)</option>)}
+                  </optgroup>
+                  {recipes.length > 0 && (
+                    <optgroup label={t("log.groupMine")}>
+                      {recipes.map(r => <option key={r.id} value={r.id}>{r.name} ({fmt(perServing(r).kcal)} kcal)</option>)}
+                    </optgroup>
+                  )}
                 </select>
               </Field>
               <Button onClick={handleAddRecipe} disabled={!selectedRecipeId} color={C.teal} className="w-full sm:w-auto"><Plus size={14} /> {t("log.addLine")}</Button>
+            </div>
+            <div className="border-t border-dashed border-[#D8CFB8] pt-3 flex flex-col sm:flex-row gap-2 items-end">
+              <Field label={t("log.quickFoods")} className="flex-1">
+                <select className={inputCls} value={quickFoodId} onChange={(e) => setQuickFoodId(e.target.value)}>
+                  <option value="">{t("log.chooseFood")}</option>
+                  {QUICK_FOODS.map(qf => <option key={qf.id} value={qf.id}>{qfName(qf)} ({fmt(qf.kcal)} kcal)</option>)}
+                </select>
+              </Field>
+              <Field label={t("log.quantity")} className="w-full sm:w-24">
+                <input type="number" step="0.5" min="0.25" className={inputCls} value={quickFoodQty} onChange={(e) => setQuickFoodQty(e.target.value)} />
+              </Field>
+              <Button onClick={handleAddQuickFood} disabled={!quickFoodId} color={C.teal} className="w-full sm:w-auto"><Plus size={14} /> {t("log.add")}</Button>
             </div>
             <div className="border-t border-dashed border-[#D8CFB8] pt-3 flex flex-col sm:flex-row gap-2 items-end">
               <Field label={t("log.quickAdd")} className="flex-1">

@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { Plus, Trash2, Flame, Scale, ChefHat, CalendarDays, User, X, Check, TrendingDown, Utensils, BookmarkPlus, BookmarkCheck, ArrowRight } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine } from "recharts";
 import { BUILTIN_INGREDIENTS } from "./ingredientsData";
+import { supabase } from "./supabaseClient";
+import AuthScreen from "./AuthScreen";
 
 // Import your custom app logo asset
 import logoIcon from "./assets/NutriNotesGood.png";
@@ -77,23 +79,6 @@ function calcTargets(p) {
   const carbsG = carbsKcal / 4;
   const weeksToGoal = p.goalRateKgWeek > 0 ? Math.abs(p.weightKg - p.targetWeightKg) / p.goalRateKgWeek : null;
   return { bmr, tdee, target: clamped, unclamped: target, wasFloored: target < safetyFloor, proteinG, fatG, carbsG, weeksToGoal };
-}
-
-// ---------- storage helpers ----------
-function loadKey(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function saveKey(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    console.error("storage save failed", key, e);
-  }
 }
 
 // ---------- UI atoms ----------
@@ -245,6 +230,9 @@ function CalorieRing({ value, target, size = 152 }) {
 
 // ---------- Main App ----------
 export default function App() {
+  // undefined = still checking for a session, null = logged out, object = logged in
+  const [session, setSession] = useState(undefined);
+
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState("dashboard");
   const [profile, setProfile] = useState(null);
@@ -254,26 +242,61 @@ export default function App() {
   const [logDate, setLogDate] = useState(todayStr());
   const [customIngredients, setCustomIngredients] = useState([]);
 
+  // Track the Supabase auth session
   useEffect(() => {
-    const p = loadKey("profile", null);
-    const r = loadKey("recipes", []);
-    const f = loadKey("foodlog", {});
-    const w = loadKey("weightlog", []);
-    const ci = loadKey("customIngredients", []);
-    setProfile(p);
-    setRecipes(r);
-    setFoodlog(f);
-    setWeightlog(w);
-    setCustomIngredients(ci);
-    setReady(true);
-    if (!p) setTab("profile");
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (!newSession) {
+        // signed out — clear local state so a different account starts clean
+        setReady(false);
+        setProfile(null);
+        setRecipes([]);
+        setFoodlog({});
+        setWeightlog([]);
+        setCustomIngredients([]);
+        setTab("dashboard");
+      }
+    });
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  useEffect(() => { if (ready) saveKey("recipes", recipes); }, [recipes, ready]);
-  useEffect(() => { if (ready) saveKey("foodlog", foodlog); }, [foodlog, ready]);
-  useEffect(() => { if (ready) saveKey("weightlog", weightlog); }, [weightlog, ready]);
-  useEffect(() => { if (ready && profile) saveKey("profile", profile); }, [profile, ready]);
-  useEffect(() => { if (ready) saveKey("customIngredients", customIngredients); }, [customIngredients, ready]);
+  // Load this user's data from Supabase once they're logged in
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("user_data")
+        .select("data")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) console.error("Failed to load your data:", error);
+      const d = data?.data || {};
+      setProfile(d.profile ?? null);
+      setRecipes(d.recipes ?? []);
+      setFoodlog(d.foodlog ?? {});
+      setWeightlog(d.weightlog ?? []);
+      setCustomIngredients(d.customIngredients ?? []);
+      setReady(true);
+      if (!d.profile) setTab("profile");
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
+  // Save this user's data back to Supabase whenever it changes (debounced)
+  useEffect(() => {
+    if (!ready || !session) return;
+    const payload = { profile, recipes, foodlog, weightlog, customIngredients };
+    const t = setTimeout(() => {
+      supabase
+        .from("user_data")
+        .upsert({ user_id: session.user.id, data: payload, updated_at: new Date().toISOString() })
+        .then(({ error }) => { if (error) console.error("Failed to save your data:", error); });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [profile, recipes, foodlog, weightlog, customIngredients, ready, session]);
 
   const allIngredients = useMemo(() => {
     const map = new Map();
@@ -311,6 +334,21 @@ export default function App() {
     setFoodlog((prev) => ({ ...prev, [date]: (prev[date] || []).filter((e) => e.id !== id) }));
   }, []);
 
+  // Still checking whether a session exists
+  if (session === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#EFE7D6] text-[#2B2620]" style={{ fontFamily: sans }}>
+        Loading…
+      </div>
+    );
+  }
+
+  // Not logged in — show the login/register screen
+  if (!session) {
+    return <AuthScreen />;
+  }
+
+  // Logged in, but this user's data hasn't loaded from Supabase yet
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#EFE7D6] text-[#2B2620]" style={{ fontFamily: sans }}>
@@ -342,12 +380,11 @@ export default function App() {
         style={{ backgroundColor: TAB_WASH[tab], transition: "background-color 0.4s ease" }}
       >
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 max-w-5xl mx-auto">
-          {/* Logo & Application Branding Block */}
           <div className="flex items-center gap-3">
             <div className="p-1 border-2 border-[#2B2620] bg-[#FFFDF7] shadow-[2px_2px_0px_#2B2620] shrink-0">
-              <img 
-                src={logoIcon} 
-                alt="NutriNotes Logo" 
+              <img
+                src={logoIcon}
+                alt="NutriNotes Logo"
                 className="w-10 h-10 object-contain"
                 onError={(e) => {
                   e.target.style.display = 'none';
@@ -362,14 +399,23 @@ export default function App() {
             </div>
           </div>
 
-          {profile && targets && (
-            <div className="flex gap-1.5 items-center bg-[#FFFDF7] border border-[#2B2620] px-2.5 py-1">
-              <Flame size={15} style={{ color: TAB_COLORS[tab] }} />
-              <span style={{ fontFamily: mono }} className="text-xs sm:text-sm font-medium">
-                {fmt(targets.target)} kcal/day target
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {profile && targets && (
+              <div className="flex gap-1.5 items-center bg-[#FFFDF7] border border-[#2B2620] px-2.5 py-1">
+                <Flame size={15} style={{ color: TAB_COLORS[tab] }} />
+                <span style={{ fontFamily: mono }} className="text-xs sm:text-sm font-medium">
+                  {fmt(targets.target)} kcal/day target
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="text-xs underline text-[#8A8270] hover:text-[#2B2620] px-1"
+              style={{ fontFamily: sans }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
         <nav className="max-w-5xl mx-auto flex gap-0.5 mt-5 overflow-x-auto">
           <Tab active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={TrendingDown} color={TAB_COLORS.dashboard}>Dashboard</Tab>

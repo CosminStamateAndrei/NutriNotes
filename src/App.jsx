@@ -447,7 +447,7 @@ export default function App() {
             removeLogEntry={removeLogEntry}
           />
         )}
-        {tab === "weight" && <WeightTab weightlog={weightlog} setWeightlog={setWeightlog} profile={profile} />}
+        {tab === "weight" && <WeightTab weightlog={weightlog} setWeightlog={setWeightlog} profile={profile} setProfile={setProfile} />}
         {tab === "plan" && <PlanTab recipes={recipes} targets={targets} />}
       </main>
       <footer className="text-center text-[10px] text-[#8A8270] pb-6 pt-2 px-4">
@@ -801,7 +801,7 @@ function RecipeEditor({ recipe, onSave, onCancel, allIngredients, addCustomIngre
 function DashboardTab({ profile, targets, foodlog, weightlog, todaysTotals }) {
   const recentWeight = useMemo(() => {
     if (!weightlog || weightlog.length === 0) return profile?.weightKg || 0;
-    return [...weightlog].sort((a,b) => b.date.localeCompare(a.date))[0].weight;
+    return [...weightlog].sort((a,b) => b.date.localeCompare(a.date))[0].weightKg;
   }, [weightlog, profile]);
 
   const chartData = useMemo(() => {
@@ -972,7 +972,7 @@ function LogTab({ logDate, setLogDate, entries, totals, targets, recipes, addLog
 }
 
 // ---------- Weight Tab ----------
-function WeightTab({ weightlog, setWeightlog, profile }) {
+function WeightTab({ weightlog, setWeightlog, profile, setProfile }) {
   const [wInput, setWInput] = useState("");
   const [dInput, setDInput] = useState(todayStr());
 
@@ -980,7 +980,14 @@ function WeightTab({ weightlog, setWeightlog, profile }) {
     if (!wInput || isNaN(+wInput)) return;
     setWeightlog(prev => {
       const filtered = prev.filter(w => w.date !== dInput);
-      return [...filtered, { date: dInput, weight: +wInput }].sort((a,b) => a.date.localeCompare(b.date));
+      const next = [...filtered, { date: dInput, weightKg: +wInput }].sort((a,b) => a.date.localeCompare(b.date));
+      // If this entry is the most recent one logged, treat it as your current
+      // weight so BMR/TDEE targets on the Dashboard and Profile stay in sync.
+      const isLatest = next[next.length - 1].date === dInput;
+      if (isLatest && setProfile) {
+        setProfile((p) => (p ? { ...p, weightKg: +wInput } : p));
+      }
+      return next;
     });
     setWInput("");
   };
@@ -1008,7 +1015,15 @@ function WeightTab({ weightlog, setWeightlog, profile }) {
                 <XAxis dataKey="date" stroke="#2B2620" style={{ fontSize: 10, fontFamily: mono }} />
                 <YAxis stroke="#2B2620" style={{ fontSize: 10, fontFamily: mono }} domain={['dataMin - 2', 'dataMax + 2']} />
                 <Tooltip />
-                <Line type="monotone" dataKey="weight" stroke={C.blue} strokeWidth={2} activeDot={{ r: 6 }} />
+                {profile?.targetWeightKg && (
+                  <ReferenceLine
+                    y={profile.targetWeightKg}
+                    stroke={C.sage}
+                    strokeDasharray="5 5"
+                    label={{ value: "Goal", position: "insideTopRight", fill: C.sageDark, fontSize: 10 }}
+                  />
+                )}
+                <Line type="monotone" dataKey="weightKg" stroke={C.blue} strokeWidth={2} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

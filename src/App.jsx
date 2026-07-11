@@ -4,6 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { BUILTIN_INGREDIENTS } from "./ingredientsData";
 import { supabase } from "./supabaseClient";
 import AuthScreen from "./AuthScreen";
+import ResetPasswordScreen from "./ResetPasswordScreen";
 import { translate, LANGUAGES } from "./i18n";
 import { BUILTIN_RECIPES, QUICK_FOODS } from "./builtinRecipes";
 
@@ -255,6 +256,8 @@ function CalorieRing({ value, target, size = 152, t }) {
 export default function App() {
   // undefined = still checking for a session, null = logged out, object = logged in
   const [session, setSession] = useState(undefined);
+  // true only while the user is here via a "reset password" email link
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   // UI language — a device-level preference, independent of the account
   const [language, setLanguage] = useState(() => {
@@ -285,8 +288,11 @@ export default function App() {
   // Track the Supabase auth session
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+      }
       if (!newSession) {
         // signed out — clear local state so a different account starts clean
         setReady(false);
@@ -380,6 +386,21 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-[#EFE7D6] text-[#2B2620]" style={{ fontFamily: sans }}>
         {t("loading.checking")}
       </div>
+    );
+  }
+
+  // Arrived here via a "reset password" email link — set a new password
+  // before anything else, regardless of whether a session exists yet.
+  if (passwordRecovery) {
+    return (
+      <ResetPasswordScreen
+        lang={language}
+        onDone={() => setPasswordRecovery(false)}
+        onCancel={() => {
+          setPasswordRecovery(false);
+          supabase.auth.signOut();
+        }}
+      />
     );
   }
 

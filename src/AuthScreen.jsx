@@ -15,20 +15,30 @@ const sans = "'Inter', sans-serif";
 export default function AuthScreen({ lang = "en", setLang }) {
   const t = (key, vars) => translate(lang, key, vars);
 
-  const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "forgot"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const resetMessages = () => {
     setError("");
     setInfo("");
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    resetMessages();
     setLoading(true);
     try {
-      if (mode === "signup") {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
+        setInfo(t("auth.resetEmailSent"));
+      } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         setInfo(t("auth.accountCreatedInfo"));
@@ -43,6 +53,12 @@ export default function AuthScreen({ lang = "en", setLang }) {
       setLoading(false);
     }
   };
+
+  const title =
+    mode === "forgot" ? t("auth.resetTitle") : mode === "signup" ? t("auth.signUpTitle") : t("auth.signInTitle");
+
+  const submitLabel =
+    mode === "forgot" ? t("auth.sendResetLink") : mode === "signup" ? t("auth.createAccount") : t("auth.signIn");
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: page, fontFamily: sans }}>
@@ -76,8 +92,14 @@ export default function AuthScreen({ lang = "en", setLang }) {
           )}
         </div>
         <p className="text-xs mb-6" style={{ color: muted }}>
-          {mode === "signin" ? t("auth.signInTitle") : t("auth.signUpTitle")}
+          {title}
         </p>
+
+        {mode === "forgot" && (
+          <p className="text-xs mb-4" style={{ color: muted }}>
+            {t("auth.resetInstructions")}
+          </p>
+        )}
 
         <form onSubmit={submit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
@@ -91,18 +113,35 @@ export default function AuthScreen({ lang = "en", setLang }) {
               style={{ borderColor: line, background: "#FFFDF7" }}
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-[11px] uppercase tracking-wide" style={{ color: muted }}>{t("auth.password")}</span>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="border px-2 py-2 text-sm focus:outline-none"
-              style={{ borderColor: line, background: "#FFFDF7" }}
-            />
-          </label>
+
+          {mode !== "forgot" && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-[11px] uppercase tracking-wide" style={{ color: muted }}>{t("auth.password")}</span>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="border px-2 py-2 text-sm focus:outline-none"
+                style={{ borderColor: line, background: "#FFFDF7" }}
+              />
+            </label>
+          )}
+
+          {mode === "signin" && (
+            <button
+              type="button"
+              onClick={() => {
+                resetMessages();
+                setMode("forgot");
+              }}
+              className="text-left text-xs underline -mt-1"
+              style={{ color: muted }}
+            >
+              {t("auth.forgotPassword")}
+            </button>
+          )}
 
           {error && <p className="text-xs" style={{ color: rust }}>{error}</p>}
           {info && <p className="text-xs" style={{ color: sage }}>{info}</p>}
@@ -113,21 +152,33 @@ export default function AuthScreen({ lang = "en", setLang }) {
             className="mt-2 py-2.5 text-sm font-medium disabled:opacity-50 transition"
             style={{ background: rust, color: card }}
           >
-            {loading ? t("auth.pleaseWait") : mode === "signin" ? t("auth.signIn") : t("auth.createAccount")}
+            {loading ? t("auth.pleaseWait") : submitLabel}
           </button>
         </form>
 
-        <button
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError("");
-            setInfo("");
-          }}
-          className="mt-4 text-xs underline"
-          style={{ color: muted }}
-        >
-          {mode === "signin" ? t("auth.needAccount") : t("auth.haveAccount")}
-        </button>
+        {mode === "forgot" ? (
+          <button
+            onClick={() => {
+              resetMessages();
+              setMode("signin");
+            }}
+            className="mt-4 text-xs underline"
+            style={{ color: muted }}
+          >
+            {t("auth.backToSignIn")}
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              resetMessages();
+              setMode(mode === "signin" ? "signup" : "signin");
+            }}
+            className="mt-4 text-xs underline"
+            style={{ color: muted }}
+          >
+            {mode === "signin" ? t("auth.needAccount") : t("auth.haveAccount")}
+          </button>
+        )}
       </div>
     </div>
   );
